@@ -76,21 +76,19 @@ class Worker : public ps::App{
            md.close();
         }
 
-        void batch_gradient_calculate(int& start, int& end){
+        void calculate_batch_gradient(int& start, int& end){
             int index = 0; float value = 0.0; float pctr = 0;
             kv_.Wait(kv_.Pull(init_index, &w_all));
             std::vector<float> g(init_index.size());
             for(int row = start; row < end; ++row){
                 std::vector<ps::Key> keys;
                 std::vector<float> values;
-                //std::vector<float> w;
                 for(int j = 0; j < train_data->fea_matrix[row].size(); j++){//for one instance
                     index = train_data->fea_matrix[row][j].fid;
                     keys.push_back(index);
                     value = train_data->fea_matrix[row][j].val;
                     values.push_back(value);
                 }
-                //kv_.Wait(kv_.Pull(keys, &w));
                 float wx = bias;
                 for(int j = 0; j < keys.size(); j++){
                     wx += w_all[keys[j]] * values[j];
@@ -107,7 +105,6 @@ class Worker : public ps::App{
         virtual void Process(){
 	        rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
-
             init_index.clear();
             for(int i = 0; i < 3e6; i++){
                 init_index.push_back(i);
@@ -115,16 +112,20 @@ class Worker : public ps::App{
             std::vector<float> init_val(3e6, 0.0);
             kv_.Wait(kv_.Push(init_index, init_val));
 
+            core_num = std::thread::hardware_concurrency();
+            ThreadPool pool(core_num);
+
             for(int epoch = 0; epoch < epochs; ++epoch){
                 train_data = new dml::LoadData(train_data_path);
                 while(1){
                     train_data->load_batch_data(batch_size);
+                    std::cout<<"batch size = "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() < batch_size) break;
                     int thread_batch = batch_size / core_num;
                     for(int i = 0; i < core_num; ++i){
                         int start = i * thread_batch;
                         int end = (i + 1) * thread_batch;
-                        batch_gradient_calculate(start, end);
+                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                     }
                 }//end for minibatch
                 if(rank == 0){
@@ -134,7 +135,6 @@ class Worker : public ps::App{
             }//end for
 
             snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-            std::cout<<" test data_path======================"<<test_data_path<<std::endl;
             test_data = new dml::LoadData(test_data_path);
             test_data->load_all_data();
             predict(rank);
