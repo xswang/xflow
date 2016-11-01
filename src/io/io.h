@@ -7,7 +7,7 @@ namespace dml{
 struct kv{
     int fgid;
     long int fid;
-    float val;
+    int val;
 };
 
 class IO{
@@ -38,7 +38,7 @@ class IO{
 
         int fgid;
         long int fid;
-        float val;
+        int val;
 
         int nchar;
         int y;

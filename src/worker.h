@@ -30,32 +30,38 @@ class Worker : public ps::App{
 	    virtual bool Run(){
 	        Process();
 	    }
-        void save_model(int st){
+        void save_model(int epoch){
             char buffer[1024];
-            snprintf(buffer, 1024, "%d", st);
+            snprintf(buffer, 1024, "%d", epoch);
             std::string filename = buffer;
             std::ofstream md;
             md.open("model/model_" + filename + ".txt");
             if(!md.is_open()) std::cout<<"save model open file error!"<<std::endl;
-            std::cout<<"feaIdx size = "<<train_data->feaIdx.size()<<std::endl;
-            for(int i = 0; i < init_index.size(); i++){
-                if(w_all[init_index[i]] != 0.0) md << init_index[i]<<"\t"<<w_all[init_index[i]]<<std::endl;
+
+            std::vector<float> w_all;
+            kv_.Wait(kv_.Pull(init_index, &w_all));
+            for(int i = 0; i < init_index.size(); ++i){
+                if(w_all[init_index[i]] != 0.0){
+                    md << init_index[i]<<"\t"<<w_all[init_index[i]]<<std::endl;
+                }
             }
             md.close();
         }
         
-        void predict(int r){
+        void predict(int rank){
            char buffer[1024];
-           snprintf(buffer, 1024, "%d", r);
+           snprintf(buffer, 1024, "%d", rank);
            std::string filename = buffer;
            std::ofstream md;
            md.open("pred_" + filename + ".txt");
            if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
            std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
+           std::vector<float> w_all;
+           kv_.Wait(kv_.Pull(init_index, &w_all));
            for(int i = 0; i < test_data->fea_matrix.size(); i++) {
                float x = 0.0;
                for(int j = 0; j < test_data->fea_matrix[i].size(); j++) {
-                   long index = test_data->fea_matrix[i][j].fid;
+                   long int index = test_data->fea_matrix[i][j].fid;
                    int value = test_data->fea_matrix[i][j].val;
                    x += w_all[index] * value;
                }
@@ -76,21 +82,24 @@ class Worker : public ps::App{
            md.close();
         }
 
-        void calculate_batch_gradient(int& start, int& end){
-            int index = 0; float value = 0.0; float pctr = 0;
-            kv_.Wait(kv_.Pull(init_index, &w_all));
+        void calculate_batch_gradient(int& start, int& end, std::vector<float>& w_all){
+            long int index = 0; int value = 0; float pctr = 0;
             std::vector<float> g(init_index.size());
+            std::cout<<"start = "<<start<<" end = "<<end<<std::endl;
             for(int row = start; row < end; ++row){
                 std::vector<ps::Key> keys;
-                std::vector<float> values;
-                for(int j = 0; j < train_data->fea_matrix[row].size(); j++){//for one instance
+                std::vector<int> values;
+                for(int j = 0; j < train_data->fea_matrix[row].size(); ++j){//for one instance
                     index = train_data->fea_matrix[row][j].fid;
                     keys.push_back(index);
                     value = train_data->fea_matrix[row][j].val;
                     values.push_back(value);
+                    std::cout<<" "<<index<<":"<<value<<std::endl;
                 }
                 float wx = bias;
+                if(rank == 0) std::cout<<"-------------row-----------------"<<row<<std::endl; 
                 for(int j = 0; j < keys.size(); j++){
+                    if(rank == 0)std::cout<<" keys = "<<j << " val = "<<keys[j]<<std::endl;
                     wx += w_all[keys[j]] * values[j];
                 }
                 pctr = sigmoid(wx);
@@ -98,6 +107,7 @@ class Worker : public ps::App{
                 for(int j = 0; j < keys.size(); j++){
                     g[keys[j]] += delta * values[j];
                 }
+                std::cout<<"================================"<<std::endl;
             }
             kv_.Wait(kv_.Push(init_index, g));
         }
@@ -106,30 +116,37 @@ class Worker : public ps::App{
 	        rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
             init_index.clear();
-            for(int i = 0; i < 3e6; i++){
+            for(int i = 0; i < 9e5; i++){
                 init_index.push_back(i);
             }
-            std::vector<float> init_val(3e6, 0.0);
+            std::vector<float> init_val(9e5, 0.0);
             kv_.Wait(kv_.Push(init_index, init_val));
 
             core_num = std::thread::hardware_concurrency();
+            core_num = 1;
             ThreadPool pool(core_num);
 
             for(int epoch = 0; epoch < epochs; ++epoch){
                 train_data = new dml::LoadData(train_data_path);
+                int batch = 0;
                 while(1){
                     train_data->load_batch_data(batch_size);
                     std::cout<<"batch size = "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() < batch_size) break;
+                    std::vector<float> w_all;
+                    kv_.Wait(kv_.Pull(init_index, &w_all));
                     int thread_batch = batch_size / core_num;
                     for(int i = 0; i < core_num; ++i){
                         int start = i * thread_batch;
                         int end = (i + 1) * thread_batch;
-                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
-                    }
-                }//end for minibatch
+                        //calculate_batch_gradient(start, end);
+                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
+                    }//end for
+                    std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
+                    ++batch;
+                }//end while
+
                 if(rank == 0){
-                    std::cout<<"end"<<std::endl;
                     save_model(epoch);
                 }
             }//end for
@@ -137,17 +154,16 @@ class Worker : public ps::App{
             snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
             test_data = new dml::LoadData(test_data_path);
             test_data->load_all_data();
+            std::cout<<"rank "<<rank<<" end!"<<std::endl;
             predict(rank);
         }//end process
 
     public:
         int core_num;
-        int batch_size = 200;
-        int epochs = 5;
+        int batch_size = 80;
+        int epochs = 1;
 
         std::vector<ps::Key> init_index;
-        std::vector<ps::Key> fea_all;
-        std::vector<float> w_all;	
         dml::LoadData *train_data;
         dml::LoadData *test_data;
         const char *train_file_path;
