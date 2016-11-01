@@ -39,12 +39,12 @@ void LoadData::load_batch_data(int num){
                 keyval.fgid = fgid;
                 keyval.fid = fid;
                 keyval.val = val;
-                //std::cout<<fgid<<":"<<fid<<":"<<val<<" ";
+                //std::cout<<fgid<<"::"<<fid<<"::"<<val<<" ";
                 sample.push_back(keyval);
                 setIter = feaIdx.find(fid);
                 if(setIter == feaIdx.end()) feaIdx.insert(fid);
             }//end while
-            std::cout<<std::endl;
+            //std::cout<<std::endl;
         }//end if
         fea_matrix.push_back(sample);
     }//end for
