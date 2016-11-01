@@ -86,33 +86,24 @@ class Worker : public ps::App{
         void calculate_batch_gradient(int& start, int& end, std::vector<float>& w_all){
             long int idx = 0; int value = 0; float pctr = 0;
             std::vector<float> g(init_index.size());
-            std::cout<<"start = "<<start<<" end = "<<end<<std::endl;
             for(int row = start; row < end; ++row){
                 std::vector<ps::Key> keys;
                 std::vector<int> values;
-                if(rank == 0){
                 for(int j = 0; j < train_data->fea_matrix[row].size(); ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
                     keys.push_back(idx);
                     value = train_data->fea_matrix[row][j].val;
                     values.push_back(value);
-                    if(rank == 0)std::cout<<""<<idx<<":"<<value<<" ";
-                }
-                std::cout<<std::endl;
                 }
                 float wx = bias;
-                if(rank == 0) std::cout<<"-------------row-----------------"<<row<<std::endl; 
                 for(int j = 0; j < keys.size(); j++){
-                    //if(rank == 0)std::cout<<" keys = "<<j << " val = "<<keys[j]<<" "<<std::endl;
                     wx += w_all[keys[j]] * values[j];
                 }
-                std::cout<<std::endl;
                 pctr = sigmoid(wx);
                 float delta = pctr - train_data->label[row];
                 for(int j = 0; j < keys.size(); j++){
                     g[keys[j]] += delta * values[j];
                 }
-                //std::cout<<"================================"<<std::endl;
             }
             kv_.Wait(kv_.Push(init_index, g));
         }
@@ -128,7 +119,7 @@ class Worker : public ps::App{
             kv_.Wait(kv_.Push(init_index, init_val));
 
             core_num = std::thread::hardware_concurrency();
-            core_num = 1;
+            //core_num = 1;
             ThreadPool pool(core_num);
 
             for(int epoch = 0; epoch < epochs; ++epoch){
@@ -136,18 +127,10 @@ class Worker : public ps::App{
                 int batch = 0;
                 while(1){
                     train_data->load_batch_data(batch_size);
-                    for(int i = 0; i < train_data->fea_matrix.size(); ++i){
-                        for(int j = 0; j < train_data->fea_matrix[0].size(); j++){
-                            int idx = train_data->fea_matrix[i][j].fid;
-                            int val = train_data->fea_matrix[i][j].val;
-                            //std::cout<<idx<<"::"<<val<<" ";
-                        }
-                        //std::cout<<std::endl;
-                    }
                     std::cout<<"batch size = "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() < batch_size){
-                            std::cout<<"read all"<<std::endl;
-                            break;
+                        std::cout<<"read all"<<std::endl;
+                        break;
                     }
                     std::vector<float> w_all;
                     kv_.Wait(kv_.Pull(init_index, &w_all));
@@ -178,7 +161,7 @@ class Worker : public ps::App{
     public:
         int a = 0;
         int core_num;
-        int batch_size = 2;
+        int batch_size = 80;
         int epochs = 1;
 
         std::mutex mutex;
