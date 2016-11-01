@@ -61,9 +61,9 @@ class Worker : public ps::App{
            for(int i = 0; i < test_data->fea_matrix.size(); i++) {
                float x = 0.0;
                for(int j = 0; j < test_data->fea_matrix[i].size(); j++) {
-                   long int index = test_data->fea_matrix[i][j].fid;
+                   long int idx = test_data->fea_matrix[i][j].fid;
                    int value = test_data->fea_matrix[i][j].val;
-                   x += w_all[index] * value;
+                   x += w_all[idx] * value;
                }
                double pctr;
                if(x < -30){
@@ -83,18 +83,18 @@ class Worker : public ps::App{
         }
 
         void calculate_batch_gradient(int& start, int& end, std::vector<float>& w_all){
-            long int index = 0; int value = 0; float pctr = 0;
+            long int idx = 0; int value = 0; float pctr = 0;
             std::vector<float> g(init_index.size());
             std::cout<<"start = "<<start<<" end = "<<end<<std::endl;
             for(int row = start; row < end; ++row){
                 std::vector<ps::Key> keys;
                 std::vector<int> values;
                 for(int j = 0; j < train_data->fea_matrix[row].size(); ++j){//for one instance
-                    index = train_data->fea_matrix[row][j].fid;
-                    keys.push_back(index);
+                    idx = train_data->fea_matrix[row][j].fid;
+                    keys.push_back(idx);
                     value = train_data->fea_matrix[row][j].val;
                     values.push_back(value);
-                    std::cout<<" "<<index<<":"<<value<<std::endl;
+                    std::cout<<" "<<idx<<":"<<value<<std::endl;
                 }
                 float wx = bias;
                 if(rank == 0) std::cout<<"-------------row-----------------"<<row<<std::endl; 
