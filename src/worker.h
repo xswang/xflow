@@ -77,10 +77,20 @@ class Worker : public ps::App{
                        double ex = pow(2.718281828, x);
                        pctr = ex / (1.0 + ex);
                }
-
                md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
            }
            md.close();
+        }
+
+        inline void filter_zero_element(std::vector<float>& gradient, std::vector<ps::Key>& nonzero_index, std::vector<float>& nonzero_gradient){
+            for(int i = 0; i < init_index.size(); i++){
+                int idx = init_index[i];
+                float g = gradient[idx];
+                if(g != 0.0){
+                    nonzero_index.push_back(idx);
+                    nonzero_gradient.push_back(g);
+                }
+            }
         }
 
         void calculate_batch_gradient(int& start, int& end, std::vector<float>& w_all){
@@ -105,17 +115,20 @@ class Worker : public ps::App{
                     g[keys[j]] += delta * values[j];
                 }
             }
-            kv_.Wait(kv_.Push(init_index, g));
+            std::vector<ps::Key> nonzero_index;
+            std::vector<float> nonzero_gradient;
+            filter_zero_element(g, nonzero_index, nonzero_gradient);
+            kv_.Wait(kv_.Push(nonzero_index, nonzero_gradient));//put gradient to servers;
         }
 
         virtual void Process(){
 	        rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
             init_index.clear();
-            for(int i = 0; i < 9e5; i++){
+            for(int i = 0; i < 2e6; i++){
                 init_index.push_back(i);
             }
-            std::vector<float> init_val(9e5, 0.0);
+            std::vector<float> init_val(2e6, 0.0);
             kv_.Wait(kv_.Push(init_index, init_val));
 
             core_num = std::thread::hardware_concurrency();
@@ -133,15 +146,15 @@ class Worker : public ps::App{
                         break;
                     }
                     std::vector<float> w_all;
-                    kv_.Wait(kv_.Pull(init_index, &w_all));
+                    kv_.Wait(kv_.Pull(init_index, &w_all));//get weight from servers
+                    int start, end;
                     int thread_batch = batch_size / core_num;
                     for(int i = 0; i < core_num; ++i){
-                        int start = i * thread_batch;
-                        int end = (i + 1) * thread_batch;
-                        //calculate_batch_gradient(start, end);
+                        start = i * thread_batch;
+                        end = (i + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
                     }//end for
-                    sleep(1);
+                    calculate_batch_gradient(start, end, w_all);
                     std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
                     ++batch;
                 }//end while
@@ -161,7 +174,7 @@ class Worker : public ps::App{
     public:
         int a = 0;
         int core_num;
-        int batch_size = 80;
+        int batch_size = 200;
         int epochs = 1;
 
         std::mutex mutex;
@@ -174,11 +187,10 @@ class Worker : public ps::App{
         char test_data_path[1024];
         int rank;
         float bias = 0.0;
-        float alpha = 0.1;
+        float alpha = 2.0;
         float beta = 1.0;
-        float lambda1 = 0.001;
+        float lambda1 = 5.0;
         float lambda2 = 0.0;
-        int step = 2;
         ps::KVWorker<float> kv_;
 };//end class worker
 

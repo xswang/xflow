@@ -2,8 +2,7 @@
 #include "ps.h"
 
 namespace dmlc{
-
-    struct ISGDHandle{
+struct ISGDHandle{
       public:
         ISGDHandle(){ ns_ = ps::NodeInfo::NumServers();}
         float alpha = 0.1, beta = 1.0;        
@@ -14,7 +13,7 @@ namespace dmlc{
       private:
         int ns_ = 0;
         static int64_t new_w;
-    };  
+};  
 
     template <typename T> 
     inline void TSave(Stream* fo, T* const ptr){
@@ -54,6 +53,7 @@ namespace dmlc{
         }
 
 	    inline void Pull(ps::Key key, const FTRLEntry& val, ps::Blob<float>& send){
+            //can add filter nonzero val.w
 	        send[0] = val.w;
 	    }
 
