@@ -5,7 +5,7 @@ namespace dmlc{
 struct ISGDHandle{
       public:
         ISGDHandle(){ ns_ = ps::NodeInfo::NumServers();}
-        float alpha = 0.1, beta = 1.0;        
+        float alpha = 1.0, beta = 1.0;        
         inline void Start(bool push, int timestamp, int cmd, void* msg) { }//must has
         void Load(Stream* fi) { }//must has
         void Save(Stream *fo) const { }//must has
@@ -53,8 +53,9 @@ struct ISGDHandle{
         }
 
 	    inline void Pull(ps::Key key, const FTRLEntry& val, ps::Blob<float>& send){
-            //can add filter nonzero val.w
-	        send[0] = val.w;
+            if(val.w != 0.0){
+	            send[0] = val.w;
+            }
 	    }
 
       private:

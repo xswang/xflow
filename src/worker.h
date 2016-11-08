@@ -60,7 +60,7 @@ class Worker : public ps::App{
            std::vector<float> w_all;
            kv_.Wait(kv_.Pull(init_index, &w_all));
            for(int i = 0; i < test_data->fea_matrix.size(); i++) {
-               float x = 0.0;
+               float x = bias;
                for(int j = 0; j < test_data->fea_matrix[i].size(); j++) {
                    long int idx = test_data->fea_matrix[i][j].fid;
                    int value = test_data->fea_matrix[i][j].val;
@@ -68,14 +68,14 @@ class Worker : public ps::App{
                }
                double pctr;
                if(x < -30){
-                       pctr = 1e-6;
+                   pctr = 1e-6;
                }
                else if(x > 30){
-                       pctr = 1.0;
+                   pctr = 1.0;
                }
                else{
-                       double ex = pow(2.718281828, x);
-                       pctr = ex / (1.0 + ex);
+                   double ex = pow(2.718281828, x);
+                   pctr = ex / (1.0 + ex);
                }
                md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
            }
@@ -132,7 +132,6 @@ class Worker : public ps::App{
             kv_.Wait(kv_.Push(init_index, init_val));
 
             core_num = std::thread::hardware_concurrency();
-            //core_num = 1;
             ThreadPool pool(core_num);
 
             for(int epoch = 0; epoch < epochs; ++epoch){
@@ -140,7 +139,7 @@ class Worker : public ps::App{
                 int batch = 0;
                 while(1){
                     train_data->load_batch_data(batch_size);
-                    std::cout<<"batch size = "<<train_data->fea_matrix.size()<<std::endl;
+                    std::cout<<"batch size= "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() < batch_size){
                         std::cout<<"read all"<<std::endl;
                         break;
@@ -155,7 +154,9 @@ class Worker : public ps::App{
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
                     }//end for
                     calculate_batch_gradient(start, end, w_all);
-                    std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
+                    //sleep(1);
+                    std::cout<<"batch = "<<batch<<std::endl;
+                    if((batch + 1) % 200 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
                     ++batch;
                 }//end while
 
@@ -167,14 +168,13 @@ class Worker : public ps::App{
             snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
             test_data = new dml::LoadData(test_data_path);
             test_data->load_all_data();
-            std::cout<<"rank "<<rank<<" end!"<<std::endl;
             predict(rank);
+            std::cout<<"rank "<<rank<<" end!"<<std::endl;
         }//end process
 
     public:
-        int a = 0;
         int core_num;
-        int batch_size = 200;
+        int batch_size = 4000;
         int epochs = 1;
 
         std::mutex mutex;
@@ -187,10 +187,6 @@ class Worker : public ps::App{
         char test_data_path[1024];
         int rank;
         float bias = 0.0;
-        float alpha = 2.0;
-        float beta = 1.0;
-        float lambda1 = 5.0;
-        float lambda2 = 0.0;
         ps::KVWorker<float> kv_;
 };//end class worker
 

@@ -10,12 +10,9 @@ using namespace dmlc;
 typedef int64_t K;
 
 class Dump {
- 
  public:
-
   Dump(string file_in, string file_out) : file_in_(file_in),file_out_(file_out) {}
   ~Dump() {data_.clear();}
-
   // value type stored on sever nodes, can be also other Entrys
   struct FTRLEntry {
     float w = 0;
@@ -39,7 +36,6 @@ class Dump {
     }
     cout << "loaded " << data_.size() << " kv pairs\n";
   }
-
   // how to dump the info
   void DumpModel(const std::string filename) {
     Stream* fo = CHECK_NOTNULL(Stream::Create(filename.c_str(), "w"));
