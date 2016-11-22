@@ -1,7 +1,3 @@
-rm pred.txt
-rm pred_0.txt
-rm pred_1.txt
-rm pred_2.txt
 Ip=("10.101.2.89" "10.101.2.90")
 for ip in ${Ip[@]}
 do

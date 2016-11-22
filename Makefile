@@ -11,6 +11,7 @@ all: ffm_ps
 
 ffm_ps: main.o $(LDFLAGS)
 	$(CPP) $(CPP_tag) -o $@ $^ $(INCLUDE)
+	rm main.o
 
 main.o: src/main.cpp
 	$(CPP) $(CPP_tag) -c src/main.cpp $(INCLUDE)

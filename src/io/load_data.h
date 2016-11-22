@@ -6,15 +6,13 @@
 namespace dml{
 class LoadData : public IO{
     public:
-        LoadData(const char *file_path) : IO(file_path){
-        }
+        LoadData(const char *file_path) : IO(file_path){}
         ~LoadData(){}
 
         void load_all_data();
         void load_batch_data(int num);
 
     public:
-
         std::set<long int> feaIdx;
         std::set<long int>::iterator setIter;
 

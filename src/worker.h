@@ -1,11 +1,11 @@
 #include <iostream>
 #include <mutex>
+#include <functional>
 #include "./io/load_data.cc"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
 
 namespace dmlc{
-
 class Worker : public ps::App{
     public:
         Worker(const char *train_file, const char *test_file) : 
@@ -31,6 +31,7 @@ class Worker : public ps::App{
 	    virtual bool Run(){
 	        Process();
 	    }
+
         void save_model(int epoch){
             char buffer[1024];
             snprintf(buffer, 1024, "%d", epoch);
@@ -46,6 +47,7 @@ class Worker : public ps::App{
                     md << init_index[i]<<"\t"<<w_all[init_index[i]]<<std::endl;
                 }
             }
+
             md.close();
         }
         
@@ -56,6 +58,7 @@ class Worker : public ps::App{
            std::ofstream md;
            md.open("pred_" + filename + ".txt");
            if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
+
            std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
            std::vector<float> w_all;
            kv_.Wait(kv_.Pull(init_index, &w_all));
@@ -87,13 +90,13 @@ class Worker : public ps::App{
                 int idx = init_index[i];
                 float g = gradient[idx];
                 if(g != 0.0){
-                    nonzero_index.push_back(idx);
-                    nonzero_gradient.push_back(g);
+                        nonzero_index.push_back(idx);
+                        nonzero_gradient.push_back(g);
                 }
             }
         }
 
-        void calculate_batch_gradient(int& start, int& end, std::vector<float>& w_all){
+        void calculate_batch_gradient(int& start, int& end, std::vector<float> &w_all){
             long int idx = 0; int value = 0; float pctr = 0;
             std::vector<float> g(init_index.size());
             for(int row = start; row < end; ++row){
@@ -119,52 +122,51 @@ class Worker : public ps::App{
             std::vector<float> nonzero_gradient;
             filter_zero_element(g, nonzero_index, nonzero_gradient);
             kv_.Wait(kv_.Push(nonzero_index, nonzero_gradient));//put gradient to servers;
+            mutex.lock();
+            calculate_gradient_thread_count++;
+            mutex.unlock();
         }
 
         virtual void Process(){
-	        rank = ps::MyRank();
+            rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
+
             init_index.clear();
             for(int i = 0; i < 2e6; i++){
                 init_index.push_back(i);
             }
             std::vector<float> init_val(2e6, 0.0);
             kv_.Wait(kv_.Push(init_index, init_val));
-
+           
             core_num = std::thread::hardware_concurrency();
             ThreadPool pool(core_num);
 
             for(int epoch = 0; epoch < epochs; ++epoch){
                 train_data = new dml::LoadData(train_data_path);
-                int batch = 0;
+                int batch = 0, start, end, thread_batch = batch_size / core_num;
                 while(1){
                     train_data->load_batch_data(batch_size);
-                    std::cout<<"batch size= "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() < batch_size){
                         std::cout<<"read all"<<std::endl;
                         break;
                     }
+                    calculate_gradient_thread_count = 0;
                     std::vector<float> w_all;
                     kv_.Wait(kv_.Pull(init_index, &w_all));//get weight from servers
-                    int start, end;
-                    int thread_batch = batch_size / core_num;
+
                     for(int i = 0; i < core_num; ++i){
                         start = i * thread_batch;
                         end = (i + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
                     }//end for
-                    calculate_batch_gradient(start, end, w_all);
-                    //sleep(1);
-                    std::cout<<"batch = "<<batch<<std::endl;
-                    if((batch + 1) % 200 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
+                    while(calculate_gradient_thread_count < core_num);
+                    if((batch + 1) % 20 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
                     ++batch;
-                }//end while
-
+                }//end while one epoch
                 if(rank == 0){
                     save_model(epoch);
                 }
-            }//end for
-
+            }//end for all train end!
             snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
             test_data = new dml::LoadData(test_data_path);
             test_data->load_all_data();
@@ -176,6 +178,7 @@ class Worker : public ps::App{
         int core_num;
         int batch_size = 4000;
         int epochs = 1;
+        int calculate_gradient_thread_count;
 
         std::mutex mutex;
         std::vector<ps::Key> init_index;

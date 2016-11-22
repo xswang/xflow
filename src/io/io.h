@@ -3,10 +3,9 @@
 #include <iostream>
 
 namespace dml{
-
 struct kv{
     int fgid;
-    long int fid;
+    size_t fid;
     int val;
 };
 
@@ -20,10 +19,10 @@ class IO{
         void Init(){
             fin_.open(file_path, std::ios::in);
             if(!fin_.is_open()){
-                std::cout<<"open file "<<file_path<<" error!"<<std::endl;
+                std::cout<<"open file "<<file_path<<" error! "<<std::endl;
                 exit(1);
             }else{
-                std::cout<<"open file "<<file_path<<" sucess!"<<std::endl;
+                std::cout<<"open file "<<file_path<<" sucess! "<<std::endl;
             }
         }
 
@@ -37,11 +36,10 @@ class IO{
         const char *file_path;
 
         int fgid;
-        long int fid;
+        size_t fid;
         int val;
 
         int nchar;
         int y;
 };
-
 }
