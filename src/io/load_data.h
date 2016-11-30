@@ -10,7 +10,7 @@ class LoadData : public IO{
         ~LoadData(){}
 
         void load_all_data();
-        void load_batch_data(int num);
+        void load_minibatch_data(int num);
 
     public:
         std::set<long int> feaIdx;

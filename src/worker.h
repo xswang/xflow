@@ -127,6 +127,70 @@ class Worker : public ps::App{
             mutex.unlock();
         }
 
+        void online_learning(int core_num){
+            ThreadPool pool(core_num);
+            train_data = new dml::LoadData(train_data_path);
+            int batch = 0, start, end, thread_batch = batch_size / core_num;
+            while(1){
+                train_data->load_minibatch_data(batch_size);
+                if(train_data->fea_matrix.size() < batch_size){
+                    std::cout<<"read all"<<std::endl;
+                    break;
+                }
+                calculate_gradient_thread_count = 0;
+                std::vector<float> w_all;
+                kv_.Wait(kv_.Pull(init_index, &w_all));//get weight from servers
+
+                for(int i = 0; i < core_num; ++i){
+                    start = i * thread_batch;
+                    end = (i + 1) * thread_batch;
+                    pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
+                }//end for
+                while(calculate_gradient_thread_count < core_num);
+                if((batch + 1) % 20 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
+                ++batch;
+            }//end while one epoch
+
+            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
+            test_data = new dml::LoadData(test_data_path);
+            test_data->load_all_data();
+            predict(rank);
+            std::cout<<"rank "<<rank<<" end!"<<std::endl;
+        }
+
+        void batch_learning(int core_num){
+            train_data = new dml::LoadData(train_data_path);
+            train_data->load_all_data();
+            std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
+
+            ThreadPool pool(core_num);
+
+            batch_num = train_data->fea_matrix.size() / batch_size;
+            for(int epoch = 0; epoch < epochs; ++epoch){
+                std::cout<<"epoch "<<epoch<<" ";
+                for(int i = 0; i < batch_num; ++i){
+                    int all_start = i * batch_size;
+                    int thread_batch = batch_size / core_num;
+                    int start, end;
+                    calculate_gradient_thread_count = 0;
+                    std::vector<float> w_all;
+                    kv_.Wait(kv_.Pull(init_index, &w_all));//get weight from servers
+
+                    for(int j = 0; j < core_num; ++j){
+                        start = all_start + j * thread_batch;
+                        end = all_start + (j + 1) * thread_batch;
+                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
+                    }
+                    while(calculate_gradient_thread_count < core_num);//m
+                }
+            }
+            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
+            test_data = new dml::LoadData(test_data_path);
+            test_data->load_all_data();
+            predict(rank);
+            std::cout<<"rank "<<rank<<" end!"<<std::endl;
+        }
+
         virtual void Process(){
             rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
@@ -139,45 +203,17 @@ class Worker : public ps::App{
             kv_.Wait(kv_.Push(init_index, init_val));
            
             core_num = std::thread::hardware_concurrency();
-            ThreadPool pool(core_num);
 
-            for(int epoch = 0; epoch < epochs; ++epoch){
-                train_data = new dml::LoadData(train_data_path);
-                int batch = 0, start, end, thread_batch = batch_size / core_num;
-                while(1){
-                    train_data->load_batch_data(batch_size);
-                    if(train_data->fea_matrix.size() < batch_size){
-                        std::cout<<"read all"<<std::endl;
-                        break;
-                    }
-                    calculate_gradient_thread_count = 0;
-                    std::vector<float> w_all;
-                    kv_.Wait(kv_.Pull(init_index, &w_all));//get weight from servers
-
-                    for(int i = 0; i < core_num; ++i){
-                        start = i * thread_batch;
-                        end = (i + 1) * thread_batch;
-                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end, w_all));
-                    }//end for
-                    while(calculate_gradient_thread_count < core_num);
-                    if((batch + 1) % 20 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
-                    ++batch;
-                }//end while one epoch
-                if(rank == 0){
-                    save_model(epoch);
-                }
-            }//end for all train end!
-            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-            test_data = new dml::LoadData(test_data_path);
-            test_data->load_all_data();
-            predict(rank);
-            std::cout<<"rank "<<rank<<" end!"<<std::endl;
+            batch_learning(core_num);
+            return;
+            online_learning(core_num);
         }//end process
 
     public:
         int core_num;
-        int batch_size = 4000;
-        int epochs = 1;
+        int batch_num;
+        int batch_size = 400;
+        int epochs = 100;
         int calculate_gradient_thread_count;
 
         std::mutex mutex;

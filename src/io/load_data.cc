@@ -7,7 +7,7 @@ void LoadData::load_all_data(){
         std::getline(fin_, line);
         sample.clear();
         const char *pline = line.c_str();
-        if(sscanf(pline, "%d%b", &y, &nchar) >= 1){
+        if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
             pline += nchar;
             label.push_back(y);
             while(sscanf(pline, "%d:%ld:%d%n", &fgid, &fid, &val, &nchar) >= 3){
@@ -16,15 +16,14 @@ void LoadData::load_all_data(){
                 keyval.fid = fid;
                 keyval.val = val;
                 sample.push_back(keyval);
-                setIter = feaIdx.find(fid);
-                if(setIter == feaIdx.end()) feaIdx.insert(fid);
             }
         }
         fea_matrix.push_back(sample);
     }
+    std::cout<<"size : "<<fea_matrix.size()<<std::endl;
 }
 
-void LoadData::load_batch_data(int num){
+void LoadData::load_minibatch_data(int num){
     fea_matrix.clear();
     for(int i = 0; i < num; ++i){
         std::getline(fin_, line);
@@ -40,8 +39,6 @@ void LoadData::load_batch_data(int num){
                 keyval.fid = fid;
                 keyval.val = val;
                 sample.push_back(keyval);
-                setIter = feaIdx.find(fid);
-                if(setIter == feaIdx.end()) feaIdx.insert(fid);
             }
         }
         fea_matrix.push_back(sample);
