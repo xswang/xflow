@@ -222,11 +222,11 @@ class Worker : public ps::App{
 
             core_num = std::thread::hardware_concurrency();
 
-            if(is_online_learning == true){
-                batch_learning(core_num);
-            }
-            else if(is_batch_learning == true){
+            if(is_online_learning == 1){
                 online_learning(core_num);
+            }
+            else if(is_batch_learning == 1){
+                batch_learning(core_num);
             }
         }//end process
 
@@ -236,8 +236,8 @@ class Worker : public ps::App{
         int batch_size = 400;
         int epochs = 100;
         int calculate_gradient_thread_count;
-        bool is_online_learning = false;
-        bool is_batch_learning = true;
+        int is_online_learning = 0;
+        int is_batch_learning = 1;
 
         std::mutex mutex;
         std::vector<ps::Key> init_index;
