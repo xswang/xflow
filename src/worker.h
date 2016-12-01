@@ -175,12 +175,6 @@ class Worker : public ps::App{
                 if((batch + 1) % 20 == 0)std::cout<<"rank "<<rank<<" batch = "<<batch<<std::endl;
                 ++batch;
             }//end while one epoch
-
-            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-            test_data = new dml::LoadData(test_data_path);
-            test_data->load_all_data();
-            predict(rank);
-            std::cout<<"rank "<<rank<<" end!"<<std::endl;
         }
 
         void batch_learning(int core_num){
@@ -195,7 +189,7 @@ class Worker : public ps::App{
 
             for(int epoch = 0; epoch < epochs; ++epoch){
                 for(int i = 0; i < batch_num; ++i){
-                    if((batch_num + 1)%30 == 0) std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
+                    if((i + 1)%30 == 0) std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
                     int start, end;
@@ -206,14 +200,8 @@ class Worker : public ps::App{
                         end = all_start + (j + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                     }
-                    while(calculate_gradient_thread_count < core_num);//m
                 }
             }
-            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-            test_data = new dml::LoadData(test_data_path);
-            test_data->load_all_data();
-            predict(rank);
-            std::cout<<"rank "<<rank<<" end!"<<std::endl;
         }
 
         virtual void Process(){
@@ -228,6 +216,11 @@ class Worker : public ps::App{
             else if(is_batch_learning == 1){
                 batch_learning(core_num);
             }
+            snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
+            test_data = new dml::LoadData(test_data_path);
+            test_data->load_all_data();
+            predict(rank);
+            std::cout<<"rank "<<rank<<" end!"<<std::endl;
         }//end process
 
     public:
