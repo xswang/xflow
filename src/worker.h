@@ -128,9 +128,7 @@ class Worker : public ps::App{
             for(int i = 0; i < keys.size(); i++){
                 weight.insert(std::pair<size_t, float>(keys[i], w[i]));
             }
-
             std::map<size_t, float> gradient;
-
             std::map<size_t, float>::iterator iter;
 
             for(int row = start; row < end; ++row){
@@ -165,6 +163,7 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_THREAD_CPUTIME_ID, &push_start_time);
 
             kv_.Wait(kv_.Push(push_keys, push_gradient));//put gradient to servers;
+
             clock_gettime(CLOCK_THREAD_CPUTIME_ID, &all_end);
             all_elapsed_time = time_diff(all_start, all_end);
 
@@ -215,8 +214,6 @@ class Worker : public ps::App{
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
                     int start, end;
-                    calculate_gradient_thread_count = 0;
-
                     for(int j = 0; j < core_num; ++j){
                         start = all_start + j * thread_batch;
                         end = all_start + (j + 1) * thread_batch;
