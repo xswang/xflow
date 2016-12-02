@@ -10,6 +10,8 @@
 #include <future>
 #include <functional>
 #include <stdexcept>
+#include <atomic>
+#include <unistd.h>
 
 class ThreadPool {
 public:
@@ -24,6 +26,8 @@ private:
     // the task queue
     std::queue< std::function<void()> > tasks;
     
+    std::atomic_llong tasks_number = {0};
+
     // synchronization
     std::mutex queue_mutex;
     std::condition_variable condition;
@@ -41,7 +45,6 @@ inline ThreadPool::ThreadPool(size_t threads)
                 for(;;)
                 {
                     std::function<void()> task;
-
                     {
                         std::unique_lock<std::mutex> lock(this->queue_mutex);
                         this->condition.wait(lock,
@@ -51,7 +54,7 @@ inline ThreadPool::ThreadPool(size_t threads)
                         task = std::move(this->tasks.front());
                         this->tasks.pop();
                     }
-
+                    tasks_number -= 1;
                     task();
                 }
             }
@@ -70,15 +73,17 @@ auto ThreadPool::enqueue(F&& f, Args&&... args)
         );
         
     std::future<return_type> res = task->get_future();
+    while(tasks_number >= 16) usleep(1); 
     {
         std::unique_lock<std::mutex> lock(queue_mutex);
-
         // don't allow enqueueing after stopping the pool
-        if(stop)
-            throw std::runtime_error("enqueue on stopped ThreadPool");
+        if(stop) throw std::runtime_error("enqueue on stopped ThreadPool");
 
         tasks.emplace([task](){ (*task)(); });
+        //std::cout<<"tasks size "<<tasks.size()<<std::endl;
+        //std::cout<<"tasks number "<<tasks_number<<std::endl;
     }
+    tasks_number += 1;
     condition.notify_one();
     return res;
 }

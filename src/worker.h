@@ -1,6 +1,8 @@
 #include <iostream>
 #include <mutex>
 #include <functional>
+#include <time.h>
+#include <unistd.h>
 #include "./io/load_data.cc"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
@@ -95,9 +97,16 @@ class Worker : public ps::App{
                 }
             }
         }
+        timespec time_diff(timespec start, timespec end){
+            timespec tmp;
+            tmp.tv_sec =  end.tv_sec-start.tv_sec;
+            return tmp;
+        }
 
-        //void calculate_batch_gradient(int& start, int& end, std::vector<float> &w_all){
         void calculate_batch_gradient(int& start, int& end){
+            timespec all_start, all_end, all_elapsed_time;
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &all_start);
+
             size_t idx = 0; int value = 0; float pctr = 0;
             std::vector<ps::Key> keys;
             std::vector<float> w;
@@ -108,8 +117,13 @@ class Worker : public ps::App{
                 }
             }
             std::sort(keys.begin(), keys.end());
-            kv_.Wait(kv_.Pull(keys, &w));
 
+            timespec pull_start_time, pull_end_time, pull_elapsed_time;
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &pull_start_time);
+            kv_.Wait(kv_.Pull(keys, &w));
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &pull_end_time);
+            pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
+            
             std::map<size_t, float> weight;
             for(int i = 0; i < keys.size(); i++){
                 weight.insert(std::pair<size_t, float>(keys[i], w[i]));
@@ -147,11 +161,20 @@ class Worker : public ps::App{
                 push_gradient.push_back(gradient[iter->first]);
             }
 
-            kv_.Wait(kv_.Push(push_keys, push_gradient));//put gradient to servers;
+            timespec push_start_time, push_end_time, push_elapsed_time;
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &push_start_time);
 
-            mutex.lock();
-            calculate_gradient_thread_count++;
-            mutex.unlock();
+            kv_.Wait(kv_.Push(push_keys, push_gradient));//put gradient to servers;
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &all_end);
+            all_elapsed_time = time_diff(all_start, all_end);
+
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &push_end_time);
+            push_elapsed_time = time_diff(push_end_time, push_start_time);
+
+            all_time += all_elapsed_time.tv_sec; 
+            all_pull_time += pull_elapsed_time.tv_sec;
+            all_push_time += push_elapsed_time.tv_sec;
+            send_key_numbers += keys.size();
         }
 
         void online_learning(int core_num){
@@ -186,10 +209,9 @@ class Worker : public ps::App{
 
             batch_num = train_data->fea_matrix.size() / batch_size;
             std::cout<<"batch_num : "<<batch_num<<std::endl;
-
             for(int epoch = 0; epoch < epochs; ++epoch){
                 for(int i = 0; i < batch_num; ++i){
-                    if((i + 1)%30 == 0) std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
+                    if((i + 1)%300 == 0) std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
                     int start, end;
@@ -200,8 +222,12 @@ class Worker : public ps::App{
                         end = all_start + (j + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                     }
-                }
-            }
+                }//end all batch
+                std::cout<<"rank "<<rank<<" all time avage: "<<all_time * 1.0 / (batch_num * core_num) <<std::endl;
+                std::cout<<"rank "<<rank<<" all push time avage: "<<all_push_time * 1.0 / (batch_num * core_num)<<std::endl;
+                std::cout<<"rank "<<rank<<" all pull time avage: "<<all_pull_time * 1.0 / (batch_num * core_num)<<std::endl;
+                std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
+            }//end all epoch
         }
 
         virtual void Process(){
@@ -216,22 +242,30 @@ class Worker : public ps::App{
             else if(is_batch_learning == 1){
                 batch_learning(core_num);
             }
+            std::cout<<"train end......"<<std::endl;
+            /*
             snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
             test_data = new dml::LoadData(test_data_path);
             test_data->load_all_data();
             predict(rank);
             std::cout<<"rank "<<rank<<" end!"<<std::endl;
+            */
         }//end process
 
     public:
+        int rank;
         int core_num;
         int batch_num;
         int batch_size = 400;
-        int epochs = 100;
+        int epochs = 1;
         int calculate_gradient_thread_count;
         int is_online_learning = 0;
         int is_batch_learning = 1;
 
+        std::atomic_llong all_time;
+        std::atomic_llong all_push_time, all_pull_time;
+        std::atomic_llong send_key_numbers = {0};
+        
         std::mutex mutex;
         std::vector<ps::Key> init_index;
         dml::LoadData *train_data;
@@ -240,7 +274,6 @@ class Worker : public ps::App{
         const char *test_file_path;
         char train_data_path[1024];
         char test_data_path[1024];
-        int rank;
         float bias = 0.0;
         ps::KVWorker<float> kv_;
 };//end class worker

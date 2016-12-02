@@ -2,11 +2,11 @@
 #include <vector>
 #include <chrono>
 
-#include "ThreadPool.h"
+#include "thread_pool.h"
 
 void task(int i){
     std::cout << "hello " << i << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    //std::this_thread::sleep_for(std::chrono::seconds(1));
     std::cout << "world " << i << std::endl;
 }
 
@@ -14,7 +14,7 @@ int main()
 {
     ThreadPool pool(4);
     std::vector< std::future<int> > results;
-    for(int i = 0; i < 8; ++i) {
+    for(int i = 0; i < 1000; ++i) {
         pool.enqueue(std::bind(task, i));
     }
     return 0;
