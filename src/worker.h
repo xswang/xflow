@@ -161,7 +161,7 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
             size_t idx = 0; int value = 0; float pctr = 0;
-            std::map<ps::Key, int> keys_map;
+            std::unordered_map<ps::Key, int> keys_map;
             auto keys = std::make_shared<std::vector<ps::Key>> ();
             std::vector<float> w;
             
@@ -188,13 +188,12 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
             
-            std::map<size_t, float> weight;
+            std::unordered_map<size_t, float> weight;
             int keys_size = (*keys).size();
             for(int i = 0; i < keys_size; i++){
                 weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
             }
-            std::map<size_t, float> gradient;
-            std::map<size_t, float>::iterator iter;
+            std::unordered_map<size_t, float> gradient;
 
             for(int row = start; row < end; ++row){
                 float wx = bias;
@@ -212,7 +211,9 @@ class Worker : public ps::App{
 
             auto push_keys = std::make_shared<std::vector<ps::Key> > ();
             auto push_gradient = std::make_shared<std::vector<float> > ();
-            for(iter = weight.begin(); iter != weight.end(); ++iter){
+            std::map<size_t, float> ordered(gradient.begin(), gradient.end());
+            //for(iter = gradient.begin(); iter != gradient.end(); ++iter){
+            for(auto iter = ordered.begin(); iter != ordered.end(); ++iter){
                 (*push_keys).push_back(iter->first);
                 (*push_gradient).push_back(gradient[iter->first]);
             }
@@ -321,7 +322,7 @@ class Worker : public ps::App{
         int rank;
         int core_num;
         int batch_num;
-        int batch_size = 400;
+        int batch_size = 1600;
         int epochs = 1;
         int calculate_gradient_thread_count;
         int is_online_learning = 0;

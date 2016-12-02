@@ -28,6 +28,7 @@ private:
     
     std::atomic_llong tasks_number = {0};
 
+    int queue_max_threads_num = 16;
     // synchronization
     std::mutex queue_mutex;
     std::condition_variable condition;
@@ -73,7 +74,7 @@ auto ThreadPool::enqueue(F&& f, Args&&... args)
         );
         
     std::future<return_type> res = task->get_future();
-    while(tasks_number >= 16) usleep(1); 
+    while(tasks_number >= queue_max_threads_num) usleep(1); 
     {
         std::unique_lock<std::mutex> lock(queue_mutex);
         // don't allow enqueueing after stopping the pool
