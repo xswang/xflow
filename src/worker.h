@@ -3,6 +3,7 @@
 #include <functional>
 #include <time.h>
 #include <unistd.h>
+#include <memory>
 #include "./io/load_data.cc"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
@@ -97,36 +98,41 @@ class Worker : public ps::App{
                 }
             }
         }
+
         timespec time_diff(timespec start, timespec end){
             timespec tmp;
-            tmp.tv_sec =  end.tv_sec-start.tv_sec;
+            tmp.tv_sec =  end.tv_sec - start.tv_sec;
+            tmp.tv_nsec = end.tv_nsec - start.tv_nsec;
             return tmp;
         }
 
         void calculate_batch_gradient(int& start, int& end){
             timespec all_start, all_end, all_elapsed_time;
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &all_start);
+            clock_gettime(CLOCK_MONOTONIC, &all_start);
 
             size_t idx = 0; int value = 0; float pctr = 0;
-            std::vector<ps::Key> keys;
+            auto keys = std::make_shared<std::vector<ps::Key>> ();
             std::vector<float> w;
             for(int row = start; row < end; ++row){
                 for(int j = 0; j < train_data->fea_matrix[row].size(); ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
-                    keys.push_back(idx);
+                    (*keys).push_back(idx);
                 }
             }
-            std::sort(keys.begin(), keys.end());
+            std::sort((*keys).begin(), (*keys).end());
+            std::vector<ps::Key>::iterator iter_keys;
+            iter_keys = unique((*keys).begin(), (*keys).end());
+            (*keys).erase(iter_keys, (*keys).end());
 
             timespec pull_start_time, pull_end_time, pull_elapsed_time;
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &pull_start_time);
-            kv_.Wait(kv_.Pull(keys, &w));
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &pull_end_time);
+            clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
+            kv_.Wait(kv_.ZPull(keys, &w));
+            clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
             
             std::map<size_t, float> weight;
-            for(int i = 0; i < keys.size(); i++){
-                weight.insert(std::pair<size_t, float>(keys[i], w[i]));
+            for(int i = 0; i < (*keys).size(); i++){
+                weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
             }
             std::map<size_t, float> gradient;
             std::map<size_t, float>::iterator iter;
@@ -139,41 +145,31 @@ class Worker : public ps::App{
                 }
                 pctr = sigmoid(wx);
                 float delta = pctr - train_data->label[row];
-                for(int j = 0; j < keys.size(); j++){
-                    iter = gradient.find(keys[j]);
-                    if(iter == gradient.end()){
-                        float g = iter->second + delta;
-                        gradient.insert(std::pair<size_t, float>(keys[j], g));
-                    }
-                    else{
-                        float g = iter->second + delta;
-                        gradient[keys[j]] = delta;
-                    }
+                for(int j = 0; j < (*keys).size(); j++){
+                    gradient[(*keys)[j]] += delta;
                 }
             }
 
-            std::vector<ps::Key> push_keys;
-            std::vector<float> push_gradient;
+            auto push_keys = std::make_shared<std::vector<ps::Key> > ();
+            auto push_gradient = std::make_shared<std::vector<float> > ();
             for(iter = weight.begin(); iter != weight.end(); ++iter){
-                push_keys.push_back(iter->first);
-                push_gradient.push_back(gradient[iter->first]);
+                (*push_keys).push_back(iter->first);
+                (*push_gradient).push_back(gradient[iter->first]);
             }
 
             timespec push_start_time, push_end_time, push_elapsed_time;
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &push_start_time);
+            clock_gettime(CLOCK_MONOTONIC, &push_start_time);
+            kv_.Wait(kv_.ZPush(push_keys, push_gradient));//put gradient to servers;
+            clock_gettime(CLOCK_MONOTONIC, &push_end_time);
+            push_elapsed_time = time_diff(push_start_time, push_end_time);
 
-            kv_.Wait(kv_.Push(push_keys, push_gradient));//put gradient to servers;
-
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &all_end);
+            clock_gettime(CLOCK_MONOTONIC, &all_end);
             all_elapsed_time = time_diff(all_start, all_end);
 
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &push_end_time);
-            push_elapsed_time = time_diff(push_end_time, push_start_time);
-
-            all_time += all_elapsed_time.tv_sec; 
-            all_pull_time += pull_elapsed_time.tv_sec;
-            all_push_time += push_elapsed_time.tv_sec;
-            send_key_numbers += keys.size();
+            all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec; 
+            all_pull_time += pull_elapsed_time.tv_sec * 1e9 + pull_elapsed_time.tv_nsec;
+            all_push_time += push_elapsed_time.tv_sec * 1e9 + push_elapsed_time.tv_nsec;
+            send_key_numbers += (*keys).size();
         }
 
         void online_learning(int core_num){
@@ -209,8 +205,19 @@ class Worker : public ps::App{
             batch_num = train_data->fea_matrix.size() / batch_size;
             std::cout<<"batch_num : "<<batch_num<<std::endl;
             for(int epoch = 0; epoch < epochs; ++epoch){
+                size_t old_all_time = 0;
+                size_t old_all_push_time = 0;
+                size_t old_all_pull_time = 0;
                 for(int i = 0; i < batch_num; ++i){
-                    if((i + 1)%300 == 0) std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
+                    if((i + 1)%300 == 0){
+                        std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
+                        std::cout<<"rank "<<rank<<" all time avage: "<<(all_time - old_all_time)* 1.0 / (300 * core_num) <<std::endl;
+                        std::cout<<"rank "<<rank<<" all push time avage: "<<(all_push_time - old_all_push_time) * 1.0 / (300 * core_num)<<std::endl;
+                        std::cout<<"rank "<<rank<<" all pull time avage: "<<(all_pull_time - old_all_pull_time) * 1.0 / (300 * core_num)<<std::endl;
+                        old_all_time = all_time;
+                        old_all_push_time = all_push_time;
+                        old_all_pull_time = all_pull_time;
+                    }
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
                     int start, end;
@@ -259,8 +266,9 @@ class Worker : public ps::App{
         int is_online_learning = 0;
         int is_batch_learning = 1;
 
-        std::atomic_llong all_time;
-        std::atomic_llong all_push_time, all_pull_time;
+        std::atomic_llong all_time = {0};
+        std::atomic_llong all_push_time = {0};
+        std::atomic_llong all_pull_time = {0};
         std::atomic_llong send_key_numbers = {0};
         
         std::mutex mutex;
