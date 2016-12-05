@@ -6,23 +6,70 @@
 #include <memory>
 #include <pmmintrin.h>
 #include <immintrin.h>
+#include "sparsehash_memory/sparsepp.h"
+
+#include "sparsehash_cpu/internal/sparseconfig.h"
+#include "sparsehash_cpu/type_traits.h"
+#include "sparsehash_cpu/sparsetable"
+#include "hash_test_interface.h"
+
 #include "./io/load_data.cc"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
+
+#include <netdb.h>  
+#include <net/if.h>  
+#include <arpa/inet.h>  
+#include <sys/ioctl.h>  
+#include <sys/types.h>  
+#include <sys/socket.h>  
+
+#define IP_SIZE     16
 
 namespace dmlc{
 class Worker : public ps::App{
     public:
         Worker(const char *train_file, const char *test_file) : 
-                train_file_path(train_file), test_file_path(test_file){ }
+                train_file_path(train_file), test_file_path(test_file){ 
+            char ip[IP_SIZE];
+            const char *test_eth = "eth0"; 
+            get_local_ip(test_eth, ip);
+            std::cout<<"worker ip "<<ip<<std::endl;
+        }
         ~Worker(){
             delete train_data;
             //delete test_data;
         } 
+ 
+    void get_local_ip(const char *eth_inf, char *ip)  {  
+        int sd;  
+        struct sockaddr_in sin;  
+        struct ifreq ifr;  
+
+        sd = socket(AF_INET, SOCK_DGRAM, 0);  
+        if (-1 == sd){  
+            std::cout<<"socket error: "<<strerror(errno)<<std::endl;  
+            return;        
+        }  
+
+        strncpy(ifr.ifr_name, eth_inf, IFNAMSIZ);  
+        ifr.ifr_name[IFNAMSIZ - 1] = 0;  
+
+        if (ioctl(sd, SIOCGIFADDR, &ifr) < 0){  
+            std::cout<<"ioctl error: "<<strerror(errno)<<std::endl;  
+            close(sd);  
+            return;  
+        }  
+
+        memcpy(&sin, &ifr.ifr_addr, sizeof(sin));  
+        snprintf(ip, IP_SIZE, "%s", inet_ntoa(sin.sin_addr));  
+
+        close(sd);  
+    }  
 
         virtual void ProcessRequest(ps::Message* request){
-	    //do nothing.
-	    }
+            //do nothing.
+        }
 
         float sigmoid(float x){
             if(x < -30) return 1e-6;
@@ -113,15 +160,17 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
             size_t idx = 0; int value = 0; float pctr = 0;
+            
             for(int row = start; row < end; ++row){
-                auto keys = std::make_shared<std::vector<ps::Key>> ();
-                std::vector<float> w;
                 int sample_size = train_data->fea_matrix[row].size();
+                auto keys = std::make_shared<std::vector<ps::Key>> ();
                 for(int j = 0; j < sample_size; ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
                     (*keys).push_back(idx);
                 }
                 std::sort((*keys).begin(), (*keys).end());
+                std::vector<float> w;
+
                 timespec pull_start_time, pull_end_time, pull_elapsed_time;
                 clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
                 kv_.Wait(kv_.ZPull(keys, &w));
@@ -161,39 +210,40 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
             size_t idx = 0; int value = 0; float pctr = 0;
-            std::unordered_map<ps::Key, int> keys_map;
             auto keys = std::make_shared<std::vector<ps::Key>> ();
-            std::vector<float> w;
-            
             for(int row = start; row < end; ++row){
                 int sample_size = train_data->fea_matrix[row].size();
                 for(int j = 0; j < sample_size; ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
                     (*keys).push_back(idx);
-                    //keys_map.insert(std::pair<ps::Key, int>(idx, 1));
                 }
             }
+            
             std::sort((*keys).begin(), (*keys).end());
             std::vector<ps::Key>::iterator iter_keys;
             iter_keys = unique((*keys).begin(), (*keys).end());
             (*keys).erase(iter_keys, (*keys).end());
-            /*
-            for(std::map<ps::Key, int>::iterator iter_keys = keys_map.begin(); iter_keys != keys_map.end(); ++iter_keys){
-                (*keys).push_back(iter_keys->first);
-            }
-            */
+            int keys_size = (*keys).size();
+            std::vector<float> w(keys_size);
+
             timespec pull_start_time, pull_end_time, pull_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
             kv_.Wait(kv_.ZPull(keys, &w));
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
             
-            std::unordered_map<size_t, float> weight;
-            int keys_size = (*keys).size();
+            //std::unordered_map<size_t, float> weight(keys_size);
+            //spp::sparse_hash_map<size_t, float> weight;
+            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> weight(keys_size);
+            weight.set_empty_key(-1);
             for(int i = 0; i < keys_size; i++){
-                weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
+                //weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
+                weight[(*keys)[i]] = w[i];
             }
-            std::unordered_map<size_t, float> gradient;
+            //std::unordered_map<size_t, float> gradient(keys_size);
+            //spp::sparse_hash_map<size_t, float> gradient;
+            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> gradient(keys_size);
+            gradient.set_empty_key(-1);
 
             for(int row = start; row < end; ++row){
                 float wx = bias;
@@ -209,13 +259,13 @@ class Worker : public ps::App{
                 }
             }
 
-            auto push_keys = std::make_shared<std::vector<ps::Key> > ();
-            auto push_gradient = std::make_shared<std::vector<float> > ();
+            auto push_keys = std::make_shared<std::vector<ps::Key> > (keys_size);
+            auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
             std::map<size_t, float> ordered(gradient.begin(), gradient.end());
-            //for(iter = gradient.begin(); iter != gradient.end(); ++iter){
-            for(auto iter = ordered.begin(); iter != ordered.end(); ++iter){
-                (*push_keys).push_back(iter->first);
-                (*push_gradient).push_back(gradient[iter->first]);
+            //for(auto iter = ordered.begin(); iter != ordered.end(); ++iter){
+            for(auto& iter : ordered){
+                (*push_keys).push_back(iter.first);
+                (*push_gradient).push_back(gradient[iter.first]);
             }
 
             timespec push_start_time, push_end_time, push_elapsed_time;
@@ -261,10 +311,14 @@ class Worker : public ps::App{
             train_data->load_all_data();
             std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
 
+            core_num *= 2;
             ThreadPool pool(core_num);
 
             batch_num = train_data->fea_matrix.size() / batch_size;
             std::cout<<"batch_num : "<<batch_num<<std::endl;
+            //std::cout<<"please enter a number to start training~~~"<<std::endl;
+            //int a;
+            //std::cin>>a;
             for(int epoch = 0; epoch < epochs; ++epoch){
                 size_t old_all_time = 0;
                 size_t old_all_push_time = 0;
@@ -272,9 +326,11 @@ class Worker : public ps::App{
                 for(int i = 0; i < batch_num; ++i){
                     if((i + 1)%300 == 0){
                         std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
+                        size_t all = (all_time - old_all_time)* 1.0 / (300 * core_num);
                         std::cout<<"rank "<<rank<<" all time avage: "<<(all_time - old_all_time)* 1.0 / (300 * core_num) <<std::endl;
                         std::cout<<"rank "<<rank<<" all push time avage: "<<(all_push_time - old_all_push_time) * 1.0 / (300 * core_num)<<std::endl;
                         std::cout<<"rank "<<rank<<" all pull time avage: "<<(all_pull_time - old_all_pull_time) * 1.0 / (300 * core_num)<<std::endl;
+                        std::cout<<"rank "<<rank<<" process per second "<<batch_size * 1e9 / all<<" thread per second "<<batch_size * 1e9 / (all * core_num) <<std::endl; 
                         old_all_time = all_time;
                         old_all_push_time = all_push_time;
                         old_all_pull_time = all_pull_time;
@@ -322,8 +378,8 @@ class Worker : public ps::App{
         int rank;
         int core_num;
         int batch_num;
-        int batch_size = 1600;
-        int epochs = 1;
+        int batch_size = 800;
+        int epochs = 100;
         int calculate_gradient_thread_count;
         int is_online_learning = 0;
         int is_batch_learning = 1;

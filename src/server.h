@@ -67,11 +67,41 @@ struct FTRLHandle : public ISGDHandle{
 
         template <typename Entry, typename Handle>
         void CreateServer(){
+            char ip[IP_SIZE];
+            const char *test_eth = "eth0";
+            get_local_ip(test_eth, ip);
+            std::cout<<"server ip "<<ip<<std::endl;
             Handle h;
             ps::OnlineServer<float, Entry, Handle> s(h);
         }
 
-	    virtual void ProcessRequest(ps::Message* request) { }
+        void get_local_ip(const char *eth_inf, char *ip)  {
+            int sd;
+            struct sockaddr_in sin;
+            struct ifreq ifr;
+
+            sd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (-1 == sd){
+                std::cout<<"socket error: "<<strerror(errno)<<std::endl;
+                return;
+            }
+
+            strncpy(ifr.ifr_name, eth_inf, IFNAMSIZ);
+            ifr.ifr_name[IFNAMSIZ - 1] = 0;
+
+            if (ioctl(sd, SIOCGIFADDR, &ifr) < 0){
+                std::cout<<"ioctl error: "<<strerror(errno)<<std::endl;
+                close(sd);
+                return;
+            }
+
+            memcpy(&sin, &ifr.ifr_addr, sizeof(sin));
+            snprintf(ip, IP_SIZE, "%s", inet_ntoa(sin.sin_addr));
+
+            close(sd);
+        }
+
+        virtual void ProcessRequest(ps::Message* request) { }
     };//end class Server
 
 }//end dmlc
