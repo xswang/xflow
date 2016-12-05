@@ -45,25 +45,20 @@ class Worker : public ps::App{
         int sd;  
         struct sockaddr_in sin;  
         struct ifreq ifr;  
-
         sd = socket(AF_INET, SOCK_DGRAM, 0);  
         if (-1 == sd){  
             std::cout<<"socket error: "<<strerror(errno)<<std::endl;  
             return;        
         }  
-
         strncpy(ifr.ifr_name, eth_inf, IFNAMSIZ);  
         ifr.ifr_name[IFNAMSIZ - 1] = 0;  
-
         if (ioctl(sd, SIOCGIFADDR, &ifr) < 0){  
             std::cout<<"ioctl error: "<<strerror(errno)<<std::endl;  
             close(sd);  
             return;  
         }  
-
         memcpy(&sin, &ifr.ifr_addr, sizeof(sin));  
         snprintf(ip, IP_SIZE, "%s", inet_ntoa(sin.sin_addr));  
-
         close(sd);  
     }  
 
@@ -83,59 +78,6 @@ class Worker : public ps::App{
 	    virtual bool Run(){
 	        Process();
 	    }
-
-        void save_model(int epoch){
-            char buffer[1024];
-            snprintf(buffer, 1024, "%d", epoch);
-            std::string filename = buffer;
-            std::ofstream md;
-            md.open("model/model_" + filename + ".txt");
-            if(!md.is_open()) std::cout<<"save model open file error!"<<std::endl;
-
-            std::vector<float> w_all;
-            kv_.Wait(kv_.Pull(init_index, &w_all));
-            for(int i = 0; i < init_index.size(); ++i){
-                if(w_all[init_index[i]] != 0.0){
-                    md << init_index[i]<<"\t"<<w_all[init_index[i]]<<std::endl;
-                }
-            }
-
-            md.close();
-        }
-        
-        void predict(int rank){
-           char buffer[1024];
-           snprintf(buffer, 1024, "%d", rank);
-           std::string filename = buffer;
-           std::ofstream md;
-           md.open("pred_" + filename + ".txt");
-           if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
-
-           std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
-           std::vector<float> w_all;
-           kv_.Wait(kv_.Pull(init_index, &w_all));
-           for(int i = 0; i < test_data->fea_matrix.size(); i++) {
-               float x = bias;
-               for(int j = 0; j < test_data->fea_matrix[i].size(); j++) {
-                   long int idx = test_data->fea_matrix[i][j].fid;
-                   int value = test_data->fea_matrix[i][j].val;
-                   x += w_all[idx] * value;
-               }
-               double pctr;
-               if(x < -30){
-                   pctr = 1e-6;
-               }
-               else if(x > 30){
-                   pctr = 1.0;
-               }
-               else{
-                   double ex = pow(2.718281828, x);
-                   pctr = ex / (1.0 + ex);
-               }
-               md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
-           }
-           md.close();
-        }
 
         inline void filter_zero_element(std::vector<float>& gradient, std::vector<ps::Key>& nonzero_index, std::vector<float>& nonzero_gradient){
             for(int i = 0; i < init_index.size(); i++){
@@ -262,7 +204,6 @@ class Worker : public ps::App{
             auto push_keys = std::make_shared<std::vector<ps::Key> > (keys_size);
             auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
             std::map<size_t, float> ordered(gradient.begin(), gradient.end());
-            //for(auto iter = ordered.begin(); iter != ordered.end(); ++iter){
             for(auto& iter : ordered){
                 (*push_keys).push_back(iter.first);
                 (*push_gradient).push_back(gradient[iter.first]);
