@@ -147,6 +147,88 @@ class Worker : public ps::App{
             }
         }
 
+        void call_back_calculate_batch_gradient(int& start, int& end){
+            timespec all_start, all_end, all_elapsed_time;
+            clock_gettime(CLOCK_MONOTONIC, &all_start);
+
+            size_t idx = 0; int value = 0; float pctr = 0;
+            auto keys = std::make_shared<std::vector<ps::Key>> ();
+            for(int row = start; row < end; ++row){
+                int sample_size = train_data->fea_matrix[row].size();
+                for(int j = 0; j < sample_size; ++j){//for one instance
+                    idx = train_data->fea_matrix[row][j].fid;
+                    (*keys).push_back(idx);
+                }
+            }
+
+            std::sort((*keys).begin(), (*keys).end());
+            std::vector<ps::Key>::iterator iter_keys;
+            iter_keys = unique((*keys).begin(), (*keys).end());
+            (*keys).erase(iter_keys, (*keys).end());
+            int keys_size = (*keys).size();
+            std::vector<float> w(keys_size);
+
+            ps::SyncOpts call_back_pull;
+            timespec pull_start_time, pull_end_time, pull_elapsed_time;
+            clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
+            //kv_.Wait(kv_.ZPull(keys, &w));
+            call_back_pull.callback = [this, start, end](){
+                    ;
+            };
+            kv_.ZPull(keys, &w, call_back_pull);
+            clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
+            pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
+
+            //std::unordered_map<size_t, float> weight(keys_size);
+            //spp::sparse_hash_map<size_t, float> weight;
+            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> weight(keys_size);
+            weight.set_empty_key(-1);
+            for(int i = 0; i < keys_size; i++){
+                weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
+                weight[(*keys)[i]] = w[i];
+            }
+            //std::unordered_map<size_t, float> gradient(keys_size);
+            //spp::sparse_hash_map<size_t, float> gradient;
+            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> gradient(keys_size);
+            gradient.set_empty_key(-1);
+
+            for(int row = start; row < end; ++row){
+                float wx = bias;
+                int sample_size = train_data->fea_matrix[row].size();
+                for(int j = 0; j < sample_size; ++j){
+                    idx = train_data->fea_matrix[row][j].fid;
+                    wx += weight[idx];
+                }
+                pctr = sigmoid(wx);
+                float delta = pctr - train_data->label[row];
+                for(int j = 0; j < keys_size; j++){
+                    gradient[(*keys)[j]] += delta;
+                }
+            }
+
+            auto push_keys = std::make_shared<std::vector<ps::Key> > (keys_size);
+            auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
+            std::map<size_t, float> ordered(gradient.begin(), gradient.end());
+            for(auto& iter : ordered){
+                (*push_keys).push_back(iter.first);
+                (*push_gradient).push_back(gradient[iter.first]);
+            }
+
+            timespec push_start_time, push_end_time, push_elapsed_time;
+            clock_gettime(CLOCK_MONOTONIC, &push_start_time);
+            kv_.Wait(kv_.ZPush(push_keys, push_gradient));//put gradient to servers;
+            clock_gettime(CLOCK_MONOTONIC, &push_end_time);
+            push_elapsed_time = time_diff(push_start_time, push_end_time);
+
+            clock_gettime(CLOCK_MONOTONIC, &all_end);
+            all_elapsed_time = time_diff(all_start, all_end);
+
+            all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec;
+            all_pull_time += pull_elapsed_time.tv_sec * 1e9 + pull_elapsed_time.tv_nsec;
+            all_push_time += push_elapsed_time.tv_sec * 1e9 + push_elapsed_time.tv_nsec;
+            send_key_numbers += keys_size;
+        }
+
         void calculate_batch_gradient(int& start, int& end){
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
@@ -179,7 +261,7 @@ class Worker : public ps::App{
             GOOGLE_NAMESPACE::dense_hash_map<size_t, float> weight(keys_size);
             weight.set_empty_key(-1);
             for(int i = 0; i < keys_size; i++){
-                //weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
+                weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
                 weight[(*keys)[i]] = w[i];
             }
             //std::unordered_map<size_t, float> gradient(keys_size);
@@ -282,8 +364,9 @@ class Worker : public ps::App{
                     for(int j = 0; j < core_num; ++j){
                         start = all_start + j * thread_batch;
                         end = all_start + (j + 1) * thread_batch;
-                        pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
+                        //pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                         //pool.enqueue(std::bind(&Worker::calculate_one_gradient, this, start, end));
+                        pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
                     }
                 }//end all batch
                 std::cout<<"rank "<<rank<<" all time avage: "<<all_time * 1.0 / (batch_num * core_num) <<std::endl;
@@ -291,7 +374,7 @@ class Worker : public ps::App{
                 std::cout<<"rank "<<rank<<" all pull time avage: "<<all_pull_time * 1.0 / (batch_num * core_num)<<std::endl;
                 std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
             }//end all epoch
-        }
+        }//end batch_learning
 
         virtual void Process(){
             rank = ps::MyRank();
@@ -319,6 +402,7 @@ class Worker : public ps::App{
         int rank;
         int core_num;
         int batch_num;
+        int call_back = 1;
         int batch_size = 800;
         int epochs = 100;
         int calculate_gradient_thread_count;
