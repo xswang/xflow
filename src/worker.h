@@ -200,7 +200,7 @@ class Worker : public ps::App{
 
                 ps::SyncOpts callback_push;
                 callback_push.callback = [this](){
-                   std::cout<<"callback_push.callback end"<<std::endl;
+                    --num_batch_fly;
                 };
                 kv_.ZPush(push_keys, push_gradient, callback_push);//put gradient to servers;
             };
@@ -318,8 +318,7 @@ class Worker : public ps::App{
             train_data->load_all_data();
             std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
 
-            core_num *= 2;
-            core_num = 1;
+            //core_num *= 2;
             ThreadPool pool(core_num);
 
             batch_num = train_data->fea_matrix.size() / batch_size;
@@ -351,7 +350,11 @@ class Worker : public ps::App{
                         end = all_start + (j + 1) * thread_batch;
                         //pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                         //pool.enqueue(std::bind(&Worker::calculate_one_gradient, this, start, end));
-                        pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
+                        //pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
+                        while(num_batch_fly > core_num) usleep(1);
+                        call_back_calculate_batch_gradient(start, end);
+                        ++num_batch_fly;
+
                     }
                 }//end all batch
                 std::cout<<"rank "<<rank<<" all time avage: "<<all_time * 1.0 / (batch_num * core_num) <<std::endl;
@@ -394,6 +397,7 @@ class Worker : public ps::App{
         int is_online_learning = 0;
         int is_batch_learning = 1;
 
+        std::atomic_llong  num_batch_fly = {0};
         std::atomic_llong all_time = {0};
         std::atomic_llong all_push_time = {0};
         std::atomic_llong all_pull_time = {0};
