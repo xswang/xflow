@@ -97,7 +97,7 @@ class Worker : public ps::App{
             return tmp;
         }
 
-        void calculate_one_gradient(int& start, int& end){
+        void calculate_one_gradient(int start, int end){
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
@@ -147,7 +147,7 @@ class Worker : public ps::App{
             }
         }
 
-        void call_back_calculate_batch_gradient(int& start, int& end){
+        void call_back_calculate_batch_gradient(int start, int end){
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
@@ -163,7 +163,6 @@ class Worker : public ps::App{
             std::vector<ps::Key>::iterator iter_keys;
             iter_keys = unique((*keys).begin(), (*keys).end());
             (*keys).erase(iter_keys, (*keys).end());
-            //std::vector<float> w;
             auto w = new std::vector<float>();
 
             ps::SyncOpts callback_pull;
@@ -172,7 +171,6 @@ class Worker : public ps::App{
                 weight.set_empty_key(-1);
                 size_t keys_size = (*keys).size();
                 for(int i = 0; i < keys_size; i++){
-                    //weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
                     weight[(*keys)[i]] = (*w)[i];
                 }
                 GOOGLE_NAMESPACE::dense_hash_map<size_t, float> gradient;
@@ -206,14 +204,14 @@ class Worker : public ps::App{
             };
             kv_.ZPull(keys, w, callback_pull);
 
-            clock_gettime(CLOCK_MONOTONIC, &all_end);
-            all_elapsed_time = time_diff(all_start, all_end);
+            //clock_gettime(CLOCK_MONOTONIC, &all_end);
+            //all_elapsed_time = time_diff(all_start, all_end);
 
-            all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec;
+            //all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec;
             send_key_numbers += (*keys).size();
         }
 
-        void calculate_batch_gradient(int& start, int& end){
+        void calculate_batch_gradient(int start, int end){
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
 
@@ -245,7 +243,6 @@ class Worker : public ps::App{
             GOOGLE_NAMESPACE::dense_hash_map<size_t, float> weight(keys_size);
             weight.set_empty_key(-1);
             for(int i = 0; i < keys_size; i++){
-                //weight.insert(std::pair<size_t, float>((*keys)[i], w[i]));
                 weight[(*keys)[i]] = w[i];
             }
             //std::unordered_map<size_t, float> gradient(keys_size);
@@ -323,14 +320,15 @@ class Worker : public ps::App{
 
             batch_num = train_data->fea_matrix.size() / batch_size;
             std::cout<<"batch_num : "<<batch_num<<std::endl;
-            //std::cout<<"please enter a number to start training~~~"<<std::endl;
-            //int a;
-            //std::cin>>a;
+            timespec allstart, allend, allelapsed;
             for(int epoch = 0; epoch < epochs; ++epoch){
                 size_t old_all_time = 0;
                 size_t old_all_push_time = 0;
                 size_t old_all_pull_time = 0;
+                clock_gettime(CLOCK_MONOTONIC, &allstart);
+                send_key_numbers = 0;
                 for(int i = 0; i < batch_num; ++i){
+                    /*
                     if((i + 1)%300 == 0){
                         std::cout<<"rank "<<rank<<" epoch "<<epoch<<" batch "<<i<<std::endl;
                         size_t all = (all_time - old_all_time)* 1.0 / (300 * core_num);
@@ -342,6 +340,7 @@ class Worker : public ps::App{
                         old_all_push_time = all_push_time;
                         old_all_pull_time = all_pull_time;
                     }
+                    */
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
                     int start, end;
@@ -352,14 +351,18 @@ class Worker : public ps::App{
                         //pool.enqueue(std::bind(&Worker::calculate_one_gradient, this, start, end));
                         //pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
                         while(num_batch_fly > core_num) usleep(1);
-                        call_back_calculate_batch_gradient(start, end);
+                        pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
+                        //call_back_calculate_batch_gradient(start, end);
                         ++num_batch_fly;
 
                     }
                 }//end all batch
-                std::cout<<"rank "<<rank<<" all time avage: "<<all_time * 1.0 / (batch_num * core_num) <<std::endl;
-                std::cout<<"rank "<<rank<<" all push time avage: "<<all_push_time * 1.0 / (batch_num * core_num)<<std::endl;
-                std::cout<<"rank "<<rank<<" all pull time avage: "<<all_pull_time * 1.0 / (batch_num * core_num)<<std::endl;
+                clock_gettime(CLOCK_MONOTONIC, &allend);
+                allelapsed = time_diff(allstart, allend);
+                std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
+                //std::cout<<"rank "<<rank<<" all time avage: "<<all_time * 1.0 / (batch_num * core_num) <<std::endl;
+                //std::cout<<"rank "<<rank<<" all push time avage: "<<all_push_time * 1.0 / (batch_num * core_num)<<std::endl;
+                //std::cout<<"rank "<<rank<<" all pull time avage: "<<all_pull_time * 1.0 / (batch_num * core_num)<<std::endl;
                 std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
             }//end all epoch
         }//end batch_learning
