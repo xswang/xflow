@@ -149,72 +149,42 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
             
-            auto unique_keys_weight = std::vector<sample_key>();
-            for(int i = 0; i < keys_size; i++){
-                sample_key sk;
-                sk.fid = (*unique_keys)[i];
-                sk.w = (*w)[i];
-                sk.sid = 0.0;
-                sk.g = 0.0;
-                unique_keys_weight.push_back(sk);
-            }
-
             auto wx = std::vector<float>(end - start + 1);
-            for(int i = 0; i < unique_keys_weight.size();){
-                for(int j = 0; j < all_keys.size();){
-                    int weight_fid = unique_keys_weight[i].fid;
-                    int allkeys_fid = all_keys[i].fid;
-                    if(allkeys_fid == weight_fid){
-                        wx[all_keys[i].sid] += unique_keys_weight[i].w;
-                        ++j;
-                    }
-                    else if(allkeys_fid > weight_fid){ 
-                        ++i;
-                    }
+            for(int j = 0, i = 0; j < all_keys.size();){
+                int allkeys_fid = all_keys[j].fid;
+                int weight_fid = (*unique_keys)[i];
+                if(allkeys_fid == weight_fid){
+                    wx[all_keys[j].sid] += (*w)[i];
+                    ++j;
+                }
+                else if(allkeys_fid > weight_fid){ 
+                    ++i;
                 }
             }
             
             for(int i = 0; i < wx.size(); i++){
                 pctr = sigmoid(wx[i]);
-                float delta = pctr - train_data->label[start++];
-                wx[i] = delta;
+                float loss = pctr - train_data->label[start++];
+                wx[i] = loss;
             }
 
-            for(int i = 0; i < all_keys.size(); i++){
-                int sid = all_keys[i].sid;
-                float g = wx[sid];
-                all_keys[i].g = g;
-            }
-            
-            for(int i = 0; i < unique_keys_weight.size(); ++i){
-                unique_keys_weight[i].g = 0.0;
-            }
-
-            for(int i = 0; i < unique_keys_weight.size();){
-                for(int j = 0; j < all_keys.size();){
-                    int weight_fid = unique_keys_weight[i].fid;
-                    int allkeys_fid = all_keys[i].fid;
-                    if(allkeys_fid == weight_fid){
-                        unique_keys_weight[i].g += all_keys[i].g;
-                        ++j;
-                    }
-                    else if(allkeys_fid > weight_fid){
-                        ++i;
-                    }
+            auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
+            for(int j = 0, i = 0; j < all_keys.size();){
+                int allkeys_fid = all_keys[j].fid;
+                int gradient_fid = (*unique_keys)[i];
+                int sid = all_keys[j].sid;
+                if(allkeys_fid == gradient_fid){
+                    (*push_gradient)[i] += wx[sid];
+                    ++j;
                 }
-            }
-
-            auto push_keys = std::make_shared<std::vector<ps::Key> > ();
-            auto push_gradient = std::make_shared<std::vector<float> > ();
-
-            for(int i = 0; i < unique_keys_weight.size(); ++i){
-                (*push_keys).push_back(unique_keys_weight[i].fid);
-                (*push_gradient).push_back(unique_keys_weight[i].g);
+                else if(allkeys_fid > gradient_fid){
+                    ++i;
+                }
             }
 
             timespec push_start_time, push_end_time, push_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &push_start_time);
-            kv_.Wait(kv_.ZPush(push_keys, push_gradient));//put gradient to servers;
+            kv_.Wait(kv_.ZPush(unique_keys, push_gradient));//put gradient to servers;
             clock_gettime(CLOCK_MONOTONIC, &push_end_time);
             push_elapsed_time = time_diff(push_start_time, push_end_time);
             clock_gettime(CLOCK_MONOTONIC, &all_end);
