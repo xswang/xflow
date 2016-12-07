@@ -3,7 +3,7 @@ rm /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/pred.txt
 rm /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/pred_0.txt
 rm /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/pred_1.txt
 rm /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/pred_2.txt
-Ip=("10.101.2.89" "10.101.2.90")
+Ip=("10.120.15.4" "10.120.15.5")
 for ip in ${Ip[@]}
 do
     ssh worker@$ip rm /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/ffm_ps

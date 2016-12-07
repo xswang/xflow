@@ -28,7 +28,7 @@ private:
     
     std::atomic_llong tasks_number = {0};
 
-    int queue_max_threads_num = 16;
+    int queue_max_threads_num = 32;
     // synchronization
     std::mutex queue_mutex;
     std::condition_variable condition;

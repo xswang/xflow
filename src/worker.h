@@ -197,14 +197,11 @@ class Worker : public ps::App{
         }
 
         void calculate_batch_gradient_for_netIO(int start, int end){
-            timespec all_start, all_end, all_elapsed_time;
-            clock_gettime(CLOCK_MONOTONIC, &all_start);
-            size_t idx = 0; int value = 0; float pctr = 0;
             auto keys = std::make_shared<std::vector<ps::Key>> ();
             for(int row = start; row < end; ++row){
                 int sample_size = train_data->fea_matrix[row].size();
                 for(int j = 0; j < sample_size; ++j){//for one instance
-                    idx = train_data->fea_matrix[row][j].fid;
+                    size_t idx = train_data->fea_matrix[row][j].fid;
                     (*keys).push_back(idx);
                 }
             }
@@ -212,26 +209,15 @@ class Worker : public ps::App{
             std::vector<ps::Key>::iterator iter_keys;
             iter_keys = unique((*keys).begin(), (*keys).end());
             (*keys).erase(iter_keys, (*keys).end());
-            int keys_size = (*keys).size();
+
             auto w = std::make_shared<std::vector<float>>();
-            timespec pull_start_time, pull_end_time, pull_elapsed_time;
-            clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
             kv_.Wait(kv_.ZPull(keys, &(*w)));
-            clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
-            pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
 
-            timespec push_start_time, push_end_time, push_elapsed_time;
-            clock_gettime(CLOCK_MONOTONIC, &push_start_time);
+            for(int i = 0; i < (*w).size(); i++){
+	        (*w)[i] = 0.999999999;
+            }
             kv_.Wait(kv_.ZPush(keys, w));//put gradient to servers;
-            clock_gettime(CLOCK_MONOTONIC, &push_end_time);
-            push_elapsed_time = time_diff(push_start_time, push_end_time);
-            clock_gettime(CLOCK_MONOTONIC, &all_end);
-            all_elapsed_time = time_diff(all_start, all_end);
 
-            all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec; 
-            all_pull_time += pull_elapsed_time.tv_sec * 1e9 + pull_elapsed_time.tv_nsec;
-            all_push_time += push_elapsed_time.tv_sec * 1e9 + push_elapsed_time.tv_nsec;
-            send_key_numbers += keys_size;
         }
 
         void batch_learning_for_netIO(int core_num){
@@ -240,40 +226,42 @@ class Worker : public ps::App{
             int train_data_size = 1000;
             train_data->fea_matrix.clear();
             std::srand(std::time(0));
+            std::vector<size_t> k;
             for(int i = 0; i < train_data_size; i++){
                 if(i % 20000 == 0) std::cout<<" init train_data "<<i<<std::endl;
                 train_data->sample.clear();
                 for(int j = 0; j < 200000; j++){
                     train_data->keyval.fid = std::rand();
+                    k.push_back(train_data->keyval.fid);
                     train_data->sample.push_back(train_data->keyval);
                 }
                 train_data->fea_matrix.push_back(train_data->sample);
             }
             std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
+            sort(k.begin(), k.end());
+            k.erase(unique(k.begin(), k.end()), k.end());
+            std::vector<float> initdata(k.size(), 0.0);
+            kv_.Wait(kv_.Push(k, initdata)); 
 
-            core_num *= 2;
             ThreadPool pool(core_num);
 
             batch_num = train_data->fea_matrix.size() / batch_size;
-            std::cout<<"batch_num : "<<batch_num<<std::endl;
-            timespec allstart, allend, allelapsed;
-            for(int epoch = 0; epoch < epochs; ++epoch){
-                clock_gettime(CLOCK_MONOTONIC, &allstart);
-                send_key_numbers = 0;
+            std::cout<<"batch_num : "<<batch_num<<" core_num "<<core_num<<std::endl;
+
+            int epoch = 0;
+            while(true){
+                epoch++;
                 for(int i = 0; i < batch_num; ++i){
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
-                    int start, end;
                     for(int j = 0; j < core_num; ++j){
-                        start = all_start + j * thread_batch;
-                        end = all_start + (j + 1) * thread_batch;
+                        int start = all_start + j * thread_batch;
+                        int end = all_start + (j + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient_for_netIO, this, start, end));
                     }
                 }//end all batch
-                clock_gettime(CLOCK_MONOTONIC, &allend);
-                allelapsed = time_diff(allstart, allend);
-                std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
-                std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
+                std::cout<<"epoch "<<epoch<<std::endl;
+                epoch++;
             }//end all epoch
         }//end batch_learning
 
@@ -300,13 +288,6 @@ class Worker : public ps::App{
                         int start = all_start + j * thread_batch;
                         int end = all_start + (j + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
-                        //pool.enqueue(std::bind(&Worker::calculate_one_gradient, this, start, end));
-                        /*
-                        while(num_batch_fly > core_num * 4) usleep(100);
-                        pool.enqueue(std::bind(&Worker::call_back_calculate_batch_gradient, this, start, end));
-                        //call_back_calculate_batch_gradient(start, end);
-                        ++num_batch_fly;
-                        */
                     }
                 }//end all batch
                 clock_gettime(CLOCK_MONOTONIC, &allend);
@@ -320,8 +301,8 @@ class Worker : public ps::App{
             rank = ps::MyRank();
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
             core_num = std::thread::hardware_concurrency();
-            batch_learning(core_num);
-            //batch_learning_for_netIO(core_num);
+            //batch_learning(core_num);
+            batch_learning_for_netIO(core_num);
             std::cout<<"train end......"<<std::endl;
         }//end process
 
@@ -330,8 +311,8 @@ class Worker : public ps::App{
         int core_num;
         int batch_num;
         int call_back = 1;
-        int batch_size = 200;
-        int epochs = 5;
+        int batch_size = 320;
+        int epochs = 10;
         int calculate_gradient_thread_count;
         int is_online_learning = 0;
         int is_batch_learning = 1;
