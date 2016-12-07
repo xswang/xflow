@@ -248,6 +248,7 @@ class Worker : public ps::App{
                 ++line_num;
             }
             std::sort(all_key_struct.begin(), all_key_struct.end(), Worker::sort_finder);
+            std::sort((*unique_keys).begin(), (*unique_keys).end());
             (*unique_keys).erase(unique((*unique_keys).begin(), (*unique_keys).end()), (*unique_keys).end());
             int keys_size = (*unique_keys).size();
 
