@@ -118,22 +118,24 @@ class Worker : public ps::App{
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
             size_t idx = 0; int value = 0; float pctr = 0;
-            auto all_key_struct = std::vector<sample_key>();
+            auto all_keys = std::vector<sample_key>();
             auto unique_keys = std::make_shared<std::vector<ps::Key>> ();;
             int line_num = 0;
             for(int row = start; row < end; ++row){
                 int sample_size = train_data->fea_matrix[row].size();
                 sample_key sk;
                 sk.sid = line_num;
+                sk.w = 0.0;
+                sk.g = 0.0;
                 for(int j = 0; j < sample_size; ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
                     sk.fid = idx;
-                    all_key_struct.push_back(sk);
+                    all_keys.push_back(sk);
                     (*unique_keys).push_back(idx);
                 }
                 ++line_num;
             }
-            std::sort(all_key_struct.begin(), all_key_struct.end(), Worker::sort_finder);
+            std::sort(all_keys.begin(), all_keys.end(), Worker::sort_finder);
             std::sort((*unique_keys).begin(), (*unique_keys).end());
             (*unique_keys).erase(unique((*unique_keys).begin(), (*unique_keys).end()), (*unique_keys).end());
             int keys_size = (*unique_keys).size();
@@ -141,26 +143,29 @@ class Worker : public ps::App{
             auto w = std::make_shared<std::vector<float>>();
             timespec pull_start_time, pull_end_time, pull_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
+
             kv_.Wait(kv_.ZPull(unique_keys, &(*w)));
+
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
             
-            auto keys_weight = std::vector<sample_key>();
+            auto unique_keys_weight = std::vector<sample_key>();
             for(int i = 0; i < keys_size; i++){
                 sample_key sk;
                 sk.fid = (*unique_keys)[i];
-                sk.w = ((*w)[i]);
-                keys_weight.push_back(sk);
+                sk.w = (*w)[i];
+                sk.sid = 0.0;
+                sk.g = 0.0;
+                unique_keys_weight.push_back(sk);
             }
 
             auto wx = std::vector<float>(end - start + 1);
-            for(int i = 0; i < keys_weight.size();){
-                for(int j = 0; j < all_key_struct.size();){
-                    int weight_fid = keys_weight[i].fid;
-                    int allkeys_fid = all_key_struct[i].fid;
+            for(int i = 0; i < unique_keys_weight.size();){
+                for(int j = 0; j < all_keys.size();){
+                    int weight_fid = unique_keys_weight[i].fid;
+                    int allkeys_fid = all_keys[i].fid;
                     if(allkeys_fid == weight_fid){
-                        wx[all_key_struct[i].sid] += keys_weight[i].w;
-                        ++i;
+                        wx[all_keys[i].sid] += unique_keys_weight[i].w;
                         ++j;
                     }
                     else if(allkeys_fid > weight_fid){ 
@@ -175,23 +180,22 @@ class Worker : public ps::App{
                 wx[i] = delta;
             }
 
-            for(int i = 0; i < all_key_struct.size(); i++){
-                int sid = all_key_struct[i].sid;
+            for(int i = 0; i < all_keys.size(); i++){
+                int sid = all_keys[i].sid;
                 float g = wx[sid];
-                all_key_struct[i].g = g;
+                all_keys[i].g = g;
             }
             
-            for(int i = 0; i < keys_weight.size(); ++i){
-                keys_weight[i].g = 0.0;
+            for(int i = 0; i < unique_keys_weight.size(); ++i){
+                unique_keys_weight[i].g = 0.0;
             }
 
-            for(int i = 0; i < keys_weight.size();){
-                for(int j = 0; j < all_key_struct.size();){
-                    int weight_fid = keys_weight[i].fid;
-                    int allkeys_fid = all_key_struct[i].fid;
+            for(int i = 0; i < unique_keys_weight.size();){
+                for(int j = 0; j < all_keys.size();){
+                    int weight_fid = unique_keys_weight[i].fid;
+                    int allkeys_fid = all_keys[i].fid;
                     if(allkeys_fid == weight_fid){
-                        keys_weight[i].g += static_cast<float>(all_key_struct[i].g);
-                        ++i;
+                        unique_keys_weight[i].g += all_keys[i].g;
                         ++j;
                     }
                     else if(allkeys_fid > weight_fid){
@@ -203,9 +207,9 @@ class Worker : public ps::App{
             auto push_keys = std::make_shared<std::vector<ps::Key> > ();
             auto push_gradient = std::make_shared<std::vector<float> > ();
 
-            for(int i = 0; i < keys_weight.size(); ++i){
-                (*push_keys).push_back(keys_weight[i].fid);
-                (*push_gradient).push_back(keys_weight[i].g);
+            for(int i = 0; i < unique_keys_weight.size(); ++i){
+                (*push_keys).push_back(unique_keys_weight[i].fid);
+                (*push_gradient).push_back(unique_keys_weight[i].g);
             }
 
             timespec push_start_time, push_end_time, push_elapsed_time;
