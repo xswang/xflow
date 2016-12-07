@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <iostream>
+
 #include <mutex>
 #include <functional>
 #include <time.h>
@@ -211,57 +213,113 @@ class Worker : public ps::App{
             send_key_numbers += (*keys).size();
         }
 
+        struct sample_key{
+            size_t fid;
+            int sid;
+            float w;
+            float g;
+        };
+
+        static bool sort_finder(const sample_key& a, const sample_key& b){
+            return a.fid < b.fid;
+        }
+
+        static bool unique_finder(const sample_key& a, const sample_key& b){
+            return a.fid == b.fid;
+        }
+
         void calculate_batch_gradient(int start, int end){
             timespec all_start, all_end, all_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &all_start);
             size_t idx = 0; int value = 0; float pctr = 0;
-            auto keys = std::make_shared<std::vector<ps::Key>> ();
+            auto all_key_struct = std::vector<sample_key>();
+            auto unique_keys = std::make_shared<std::vector<ps::Key>> ();;
+            int line_num = 0;
             for(int row = start; row < end; ++row){
                 int sample_size = train_data->fea_matrix[row].size();
+                sample_key sk;
+                sk.sid = line_num;
                 for(int j = 0; j < sample_size; ++j){//for one instance
                     idx = train_data->fea_matrix[row][j].fid;
-                    (*keys).push_back(idx);
+                    sk.fid = idx;
+                    all_key_struct.push_back(sk);
+                    (*unique_keys).push_back(idx);
                 }
+                ++line_num;
             }
-            std::sort((*keys).begin(), (*keys).end());
-            std::vector<ps::Key>::iterator iter_keys;
-            iter_keys = unique((*keys).begin(), (*keys).end());
-            (*keys).erase(iter_keys, (*keys).end());
-            int keys_size = (*keys).size();
+            std::sort(all_key_struct.begin(), all_key_struct.end(), Worker::sort_finder);
+            (*unique_keys).erase(unique((*unique_keys).begin(), (*unique_keys).end()), (*unique_keys).end());
+            int keys_size = (*unique_keys).size();
 
             auto w = std::make_shared<std::vector<float>>();
             timespec pull_start_time, pull_end_time, pull_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
-            kv_.Wait(kv_.ZPull(keys, &(*w)));
+            kv_.Wait(kv_.ZPull(unique_keys, &(*w)));
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
-            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> weight(keys_size);
-            weight.set_empty_key(-1);
+            
+            auto keys_weight = std::vector<sample_key>();
             for(int i = 0; i < keys_size; i++){
-                weight[(*keys)[i]] = (*w)[i];
+                sample_key sk;
+                sk.fid = (*unique_keys)[i];
+                sk.w = ((*w)[i]);
+                keys_weight.push_back(sk);
             }
-            GOOGLE_NAMESPACE::dense_hash_map<size_t, float> gradient(keys_size);
-            gradient.set_empty_key(-1);
-            for(int row = start; row < end; ++row){
-                float wx = bias;
-                int sample_size = train_data->fea_matrix[row].size();
-                for(int j = 0; j < sample_size; ++j){
-                    idx = train_data->fea_matrix[row][j].fid;
-                    wx += weight[idx];
+
+            auto wx = std::vector<float>(end - start + 1);
+            for(int i = 0; i < keys_weight.size();){
+                for(int j = 0; j < all_key_struct.size();){
+                    int weight_fid = keys_weight[i].fid;
+                    int allkeys_fid = all_key_struct[i].fid;
+                    if(allkeys_fid == weight_fid){
+                        wx[all_key_struct[i].sid] += keys_weight[i].w;
+                        ++i;
+                        ++j;
+                    }
+                    else if(allkeys_fid > weight_fid){ 
+                        ++i;
+                    }
                 }
-                pctr = sigmoid(wx);
-                float delta = pctr - train_data->label[row];
-                for(int j = 0; j < keys_size; j++){
-                    gradient[(*keys)[j]] += delta;
+            }
+            
+            for(int i = 0; i < wx.size(); i++){
+                pctr = sigmoid(wx[i]);
+                float delta = pctr - train_data->label[start++];
+                wx[i] = delta;
+            }
+
+            for(int i = 0; i < all_key_struct.size(); i++){
+                int sid = all_key_struct[i].sid;
+                float g = wx[sid];
+                all_key_struct[i].g = g;
+            }
+            
+            for(int i = 0; i < keys_weight.size(); ++i){
+                keys_weight[i].g = 0.0;
+            }
+
+            for(int i = 0; i < keys_weight.size();){
+                for(int j = 0; j < all_key_struct.size();){
+                    int weight_fid = keys_weight[i].fid;
+                    int allkeys_fid = all_key_struct[i].fid;
+                    if(allkeys_fid == weight_fid){
+                        keys_weight[i].g += static_cast<float>(all_key_struct[i].g);
+                    }
+                    else if(allkeys_fid > weight_fid){
+                        ++i;
+                    }
+                    ++j;
                 }
             }
-            auto push_keys = std::make_shared<std::vector<ps::Key> > (keys_size);
-            auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
-            std::map<size_t, float> ordered(gradient.begin(), gradient.end());
-            for(auto& iter : ordered){
-                (*push_keys).push_back(iter.first);
-                (*push_gradient).push_back(gradient[iter.first]);
+
+            auto push_keys = std::make_shared<std::vector<ps::Key> > ();
+            auto push_gradient = std::make_shared<std::vector<float> > ();
+
+            for(int i = 0; i < keys_weight.size(); ++i){
+                (*push_keys).push_back(keys_weight[i].fid);
+                (*push_gradient).push_back(keys_weight[i].g);
             }
+
             timespec push_start_time, push_end_time, push_elapsed_time;
             clock_gettime(CLOCK_MONOTONIC, &push_start_time);
             kv_.Wait(kv_.ZPush(push_keys, push_gradient));//put gradient to servers;
@@ -353,6 +411,7 @@ class Worker : public ps::App{
                 train_data->fea_matrix.push_back(train_data->sample);
             }
             std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
+
             core_num *= 2;
             ThreadPool pool(core_num);
 
@@ -360,9 +419,6 @@ class Worker : public ps::App{
             std::cout<<"batch_num : "<<batch_num<<std::endl;
             timespec allstart, allend, allelapsed;
             for(int epoch = 0; epoch < epochs; ++epoch){
-                size_t old_all_time = 0;
-                size_t old_all_push_time = 0;
-                size_t old_all_pull_time = 0;
                 clock_gettime(CLOCK_MONOTONIC, &allstart);
                 send_key_numbers = 0;
                 for(int i = 0; i < batch_num; ++i){
@@ -400,11 +456,11 @@ class Worker : public ps::App{
                 send_key_numbers = 0;
                 for(int i = 0; i < batch_num; ++i){
                     int all_start = i * batch_size;
+                    int all_end = (i + 1)* batch_size;
                     int thread_batch = batch_size / core_num;
-                    int start, end;
                     for(int j = 0; j < core_num; ++j){
-                        start = all_start + j * thread_batch;
-                        end = all_start + (j + 1) * thread_batch;
+                        int start = all_start + j * thread_batch;
+                        int end = all_start + (j + 1) * thread_batch;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient, this, start, end));
                         //pool.enqueue(std::bind(&Worker::calculate_one_gradient, this, start, end));
                         /*
