@@ -305,11 +305,12 @@ class Worker : public ps::App{
                     int allkeys_fid = all_key_struct[i].fid;
                     if(allkeys_fid == weight_fid){
                         keys_weight[i].g += static_cast<float>(all_key_struct[i].g);
+                        ++i;
+                        ++j;
                     }
                     else if(allkeys_fid > weight_fid){
                         ++i;
                     }
-                    ++j;
                 }
             }
 
