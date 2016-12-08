@@ -72,7 +72,7 @@ struct FTRLHandle : public ISGDHandle{
             get_local_ip(test_eth, ip);
             std::cout<<"server ip "<<ip<<std::endl;
             Handle h;
-            ps::OnlineServer<float, Entry, Handle> s(h);
+            ps::OnlineServer<float, Entry, Handle> s(h, 1, 24);
         }
 
         void get_local_ip(const char *eth_inf, char *ip)  {

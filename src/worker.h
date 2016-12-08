@@ -102,8 +102,6 @@ class Worker : public ps::App{
         struct sample_key{
             size_t fid;
             int sid;
-            float w;
-            float g;
         };
 
         static bool sort_finder(const sample_key& a, const sample_key& b){
@@ -125,10 +123,8 @@ class Worker : public ps::App{
                 int sample_size = train_data->fea_matrix[row].size();
                 sample_key sk;
                 sk.sid = line_num;
-                sk.w = 0.0;
-                sk.g = 0.0;
                 for(int j = 0; j < sample_size; ++j){//for one instance
-                    idx = train_data->fea_matrix[row][j].fid;
+                    idx = h(train_data->fea_matrix[row][j].fid);
                     sk.fid = idx;
                     all_keys.push_back(sk);
                     (*unique_keys).push_back(idx);
@@ -197,7 +193,8 @@ class Worker : public ps::App{
         }
 
         void calculate_batch_gradient_for_netIO(int start, int end){
-            auto keys = std::make_shared<std::vector<ps::Key>> ();
+            auto keys = std::make_shared<std::vector<size_t>> ();
+            std::cout<<" size_t size "<<sizeof(size_t)<<std::endl;
             for(int row = start; row < end; ++row){
                 int sample_size = train_data->fea_matrix[row].size();
                 for(int j = 0; j < sample_size; ++j){//for one instance
@@ -209,39 +206,41 @@ class Worker : public ps::App{
             std::vector<ps::Key>::iterator iter_keys;
             iter_keys = unique((*keys).begin(), (*keys).end());
             (*keys).erase(iter_keys, (*keys).end());
+            //std::cout<<"thread batch keys size "<<(*keys).size()<<std::endl;
+
+            auto initdata = std::make_shared<std::vector<float>>();
+            for(int i = 0; i < (*keys).size(); i++) (*initdata).push_back(0.01);
+            kv_.Wait(kv_.ZPush(keys, initdata));
 
             auto w = std::make_shared<std::vector<float>>();
-            kv_.Wait(kv_.ZPull(keys, &(*w)));
-
-            for(int i = 0; i < (*w).size(); i++){
-	        (*w)[i] = 0.999999999;
+            while(1){
+                //std::cout<<" pthread_id "<<pthread_self()<<1<<std::endl;
+                kv_.Wait(kv_.ZPull(keys, &(*w)));
+                //std::cout<<" pthread_id" <<pthread_self()<<2<<std::endl;
+                kv_.Wait(kv_.ZPush(keys, w));//put gradient to servers;
+                //std::cout<<" pthread_id "<<pthread_self()<<3<<std::endl;
             }
-            kv_.Wait(kv_.ZPush(keys, w));//put gradient to servers;
-
         }
 
         void batch_learning_for_netIO(int core_num){
             train_data = new dml::LoadData(train_data_path);
-            std::hash<std::string> h;
-            int train_data_size = 1000;
+            std::hash<size_t> h;
+            int train_data_size = 100000;
             train_data->fea_matrix.clear();
             std::srand(std::time(0));
             std::vector<size_t> k;
             for(int i = 0; i < train_data_size; i++){
                 if(i % 20000 == 0) std::cout<<" init train_data "<<i<<std::endl;
                 train_data->sample.clear();
-                for(int j = 0; j < 200000; j++){
-                    train_data->keyval.fid = std::rand();
+                for(int j = 0; j < 20000; j++){
+                    size_t idx = h(std::rand());                    
+                    train_data->keyval.fid = idx;
                     k.push_back(train_data->keyval.fid);
                     train_data->sample.push_back(train_data->keyval);
                 }
                 train_data->fea_matrix.push_back(train_data->sample);
             }
             std::cout<<"train_data size : "<<train_data->fea_matrix.size()<<std::endl;
-            sort(k.begin(), k.end());
-            k.erase(unique(k.begin(), k.end()), k.end());
-            std::vector<float> initdata(k.size(), 0.0);
-            kv_.Wait(kv_.Push(k, initdata)); 
 
             ThreadPool pool(core_num);
 
@@ -249,8 +248,7 @@ class Worker : public ps::App{
             std::cout<<"batch_num : "<<batch_num<<" core_num "<<core_num<<std::endl;
 
             int epoch = 0;
-            while(true){
-                epoch++;
+            while(epoch < 40){
                 for(int i = 0; i < batch_num; ++i){
                     int all_start = i * batch_size;
                     int thread_batch = batch_size / core_num;
@@ -268,7 +266,7 @@ class Worker : public ps::App{
         void batch_learning(int core_num){
             train_data = new dml::LoadData(train_data_path);
             train_data->load_all_data();
-            std::hash<std::string> h;
+            //std::hash<std::string> h;
             ThreadPool pool(core_num);
 
             batch_num = train_data->fea_matrix.size() / batch_size;
@@ -311,7 +309,7 @@ class Worker : public ps::App{
         int core_num;
         int batch_num;
         int call_back = 1;
-        int batch_size = 320;
+        int batch_size = 3200;
         int epochs = 10;
         int calculate_gradient_thread_count;
         int is_online_learning = 0;
@@ -322,6 +320,7 @@ class Worker : public ps::App{
         std::atomic_llong all_push_time = {0};
         std::atomic_llong all_pull_time = {0};
         std::atomic_llong send_key_numbers = {0};
+        std::hash<size_t> h;
         
         std::mutex mutex;
         std::vector<ps::Key> init_index;
