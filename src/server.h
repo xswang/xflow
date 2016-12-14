@@ -1,5 +1,6 @@
 #include "iostream"
 #include "ps.h"
+#include "utils.h"
 
 namespace dmlc{
 struct ISGDHandle{
@@ -17,24 +18,24 @@ struct ISGDHandle{
 
 template <typename T> 
 inline void TSave(Stream* fo, T* const ptr){
-	fo->Write(&ptr->w, sizeof(float));
+    fo->Write(&ptr->w, sizeof(float));
 }
 
 struct FTRLEntry{
-    float w = 0.0;
+    float w = 0.99;
     float z = 0.0;
     float sq_cum_grad = 0.0;
     inline void Load(Stream *fi) { }//must has
     inline void Save(Stream *fo) const {
-	    TSave(fo, this); 
-	}//must has
+	TSave(fo, this);
+    }//must has
     inline bool Empty() const { }//must has
 };
 
 struct FTRLHandle : public ISGDHandle{
     public:
         inline void Push(ps::Key key, ps::Blob<const float> grad, FTRLEntry& val){
-	        float g = grad[0];
+	    float g = grad[0];
             float sqrt_n = val.sq_cum_grad;
             float sqrt_n_new = sqrt(sqrt_n * sqrt_n + g * g);
             val.z += g - (sqrt_n_new - sqrt_n) / alpha * val.w;
@@ -49,59 +50,29 @@ struct FTRLHandle : public ISGDHandle{
                 float tmpl = -1 * ( (beta + val.sq_cum_grad)/alpha  + lambda2 );
                 val.w = tmpr / tmpl;
             }
-        }
+        }//end Push
 
-	    inline void Pull(ps::Key key, const FTRLEntry& val, ps::Blob<float>& send){
-	        send[0] = val.w;
-	    }
+	inline void Pull(ps::Key key, const FTRLEntry& val, ps::Blob<float>& send){
+            send[0] = val.w;
+	}//end Pull
 
     private:
 };//end struct FTRLHandle
 
-    class Server : public ps::App{
-      public:
+class Server : public ps::App{
+    public:
         Server(){
             CreateServer<FTRLEntry, FTRLHandle>();
         }
-	    ~Server(){}
+	~Server(){}
 
         template <typename Entry, typename Handle>
         void CreateServer(){
-            char ip[IP_SIZE];
-            const char *test_eth = "eth0";
-            get_local_ip(test_eth, ip);
-            std::cout<<"server ip "<<ip<<std::endl;
             Handle h;
-            ps::OnlineServer<float, Entry, Handle> s(h, 1, 24);
-        }
-
-        void get_local_ip(const char *eth_inf, char *ip)  {
-            int sd;
-            struct sockaddr_in sin;
-            struct ifreq ifr;
-
-            sd = socket(AF_INET, SOCK_DGRAM, 0);
-            if (-1 == sd){
-                std::cout<<"socket error: "<<strerror(errno)<<std::endl;
-                return;
-            }
-
-            strncpy(ifr.ifr_name, eth_inf, IFNAMSIZ);
-            ifr.ifr_name[IFNAMSIZ - 1] = 0;
-
-            if (ioctl(sd, SIOCGIFADDR, &ifr) < 0){
-                std::cout<<"ioctl error: "<<strerror(errno)<<std::endl;
-                close(sd);
-                return;
-            }
-
-            memcpy(&sin, &ifr.ifr_addr, sizeof(sin));
-            snprintf(ip, IP_SIZE, "%s", inet_ntoa(sin.sin_addr));
-
-            close(sd);
+            ps::OnlineServer<float, Entry, Handle> s(h, 1, 32);
         }
 
         virtual void ProcessRequest(ps::Message* request) { }
-    };//end class Server
+};//end class Server
 
 }//end dmlc
