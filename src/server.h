@@ -1,6 +1,5 @@
 #include "iostream"
 #include "ps.h"
-#include "utils.h"
 
 namespace dmlc{
 struct ISGDHandle{

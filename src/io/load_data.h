@@ -11,7 +11,7 @@ class LoadData : public IO{
 
         void load_all_data();
         void load_minibatch_data(int num);
-
+        void load_mibibatch_hash_data(int num);
     public:
         std::set<long int> feaIdx;
         std::set<long int>::iterator setIter;

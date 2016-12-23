@@ -1,6 +1,7 @@
 #pragma once
 #include <fstream>
 #include <iostream>
+#include <functional>
 
 namespace dml{
 struct kv{
@@ -38,6 +39,8 @@ class IO{
         int fgid;
         size_t fid;
         int val;
+        std::string fid_str;
+        std::hash<std::string> h;
 
         int nchar;
         int y;

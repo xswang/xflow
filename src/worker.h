@@ -19,9 +19,9 @@
 #include "hash_test_interface.h"
 
 #include "./io/load_data.cc"
+#include "./io/load_data_from_kafka.cc"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
-#include "utils.h"
 
 #include <netdb.h>  
 #include <net/if.h>  
@@ -36,7 +36,7 @@ namespace dmlc{
 class Worker : public ps::App{
     public:
         Worker(const char *train_file, const char *test_file) : 
-                train_file_path(train_file), test_file_path(test_file){ 
+            train_file_path(train_file), test_file_path(test_file){ 
         }
         ~Worker(){
             delete train_data;
@@ -55,9 +55,9 @@ class Worker : public ps::App{
             }
         }
 
-	    virtual bool Run(){
-	        Process();
-	    }
+	virtual bool Run(){
+	    Process();
+	}
 
         inline void filter_zero_element(std::vector<float>& gradient, std::vector<ps::Key>& nonzero_index, std::vector<float>& nonzero_gradient){
             for(int i = 0; i < init_index.size(); i++){
@@ -161,6 +161,11 @@ class Worker : public ps::App{
         }
 
         void batch_learning_callback(int core_num){
+            train_data_kafka = new dml::LoadData_from_kafka();
+            std::cout<<"start load kafka data"<<std::endl;
+            train_data_kafka->load_data_from_kafka(10);
+            std::cout<<"load kafka data end"<<std::endl;
+            return;
             train_data = new dml::LoadData(train_data_path);
             train_data->load_all_data();
             ThreadPool pool(core_num);
@@ -175,7 +180,13 @@ class Worker : public ps::App{
                     int all_start = i * batch_size;
                     int all_end = (i + 1)* batch_size;
                     int thread_batch = batch_size / core_num;
-                    calculate_batch_gradient_callback(pool, all_start, all_end);
+                    for(int j = 0; j < core_num; ++j){
+                        int start = all_start + j * thread_batch;
+                        int end = all_start + (j + 1) * thread_batch;
+                        calculate_batch_gradient_callback(pool, start, end);
+                        //pool.enqueue(std::bind(&Worker::calculate_batch_gradient_callback, this, pool, start, end));
+                        //if(i == 0) usleep(4000);
+                    }
                 }//end all batch
                 clock_gettime(CLOCK_MONOTONIC, &allend);
                 allelapsed = time_diff(allstart, allend);
@@ -295,6 +306,7 @@ class Worker : public ps::App{
 
         virtual void Process(){
             rank = ps::MyRank();
+            
             snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
             core_num = std::thread::hardware_concurrency();
             //batch_learning_threadpool(core_num);
@@ -316,12 +328,14 @@ class Worker : public ps::App{
         std::atomic_llong all_push_time = {0};
         std::atomic_llong all_pull_time = {0};
         std::atomic_llong send_key_numbers = {0};
+      
         std::hash<size_t> h;
         
         std::mutex mutex;
         std::vector<ps::Key> init_index;
         dml::LoadData *train_data;
         dml::LoadData *test_data;
+        dml::LoadData_from_kafka *train_data_kafka;
         const char *train_file_path;
         const char *test_file_path;
         char train_data_path[1024];
