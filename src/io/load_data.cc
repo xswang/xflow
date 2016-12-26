@@ -55,7 +55,7 @@ void LoadData::load_mibibatch_hash_data(int num){
         if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
    	    pline += nchar;
             label.push_back(y);
-	    while(sscanf(pline, "%s%n", &fid_str) >= 1){
+	    while(sscanf(pline, "%s", fid_str) >= 1){
       		pline += nchar;
                 keyval.fid = h(fid_str);
                 sample.push_back(keyval);

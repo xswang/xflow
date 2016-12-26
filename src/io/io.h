@@ -39,10 +39,10 @@ class IO{
         int fgid;
         size_t fid;
         int val;
-        std::string fid_str;
+        char fid_str[1024];
         std::hash<std::string> h;
 
         int nchar;
-        int y;
+        float y;
 };
 }

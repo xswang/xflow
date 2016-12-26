@@ -21,7 +21,7 @@ inline void TSave(Stream* fo, T* const ptr){
 }
 
 struct FTRLEntry{
-    float w = 0.99;
+    float w = 0.0;
     float z = 0.0;
     float sq_cum_grad = 0.0;
     inline void Load(Stream *fi) { }//must has

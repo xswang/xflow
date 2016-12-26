@@ -1,4 +1,4 @@
-#include "load_data_from_kafka.h"
+#include "/home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/src/io/load_data_from_kafka.h"
 
 namespace dml{
     void LoadData_from_kafka::load_data_from_kafka(int num){
