@@ -65,18 +65,20 @@ void LoadData::load_mibibatch_hash_data(int num){
     }
 }
 
-void LoadData::load_minibatch_hash_data_fread(int bufsize){
-    size_t btop, bmax;
-    int buffer_size = bufsize << 20;
-    std::vector<char> buf(buffer_size);
+void LoadData::load_minibatch_hash_data_fread(){
+    fea_matrix.clear();
     if(bmax < btop){
 	memmove(&buf[0], &buf[bmax], (btop - bmax) * sizeof(char));
+	//char *p = &buf[0];
+	//std::cout<<"buf[0] = "<<std::string(&buf[0])<<std::endl;
     }
     btop -= bmax;
     btop += fread(&buf[btop], sizeof(char), buf.size() - 1 - btop, fp_);
+    //std::cout<<"buffer_size = "<<buf.size()<<std::endl;
+    //std::cout<<"btop = "<<btop<<std::endl;
     bmax = btop;
     if(btop + 1 == buf.size()){
-	while(bmax > 0 && buf[bmax-1] != EOF && buf[bmax-1] != '\n' && buf[bmax-1] != '\r') --bmax;
+	while(bmax > 0 && buf[bmax-1] != EOF && buf[bmax-1] != '\n') --bmax;
         if(bmax != 0){
 	    buf[bmax - 1] = '\0';
 	}
@@ -88,25 +90,50 @@ void LoadData::load_minibatch_hash_data_fread(int bufsize){
     else {
         buf[bmax] = '\0';	
     } 
-    
-    fea_matrix.clear();
+    std::cout<<"bmax = "<<bmax<<std::endl;
+ 
     char *p = &buf[0];
+    //std::cout<<"fisrt buf *p = "<<std::string(p)<<std::endl;
     while(*p != '\0'){
 	char *q = p;
 	while(*q != '\t') ++q;
+        *q = '\0';
         y = std::atoi(p);
-        p = q + 1;
+        label.push_back(y);
+        //std::cout<<"y = "<<y<<std::endl;
+        ++q;
+        p = q;
         sample.clear();
         while(*q != '\n'){
-            while(*q != ' ') ++q;
+            while(*q != ' ' && *q != '\n' && *q != '\0') ++q;
+	    if(*q == '\n'){
+		*q = '\0';
+                //std::cout<<std::string(p)<<" ";
+		keyval.fid = h(std::string(p));
+		sample.push_back(keyval);
+	        ++q;
+		p = q;
+		break;
+  	    }
+	    if(*q == '\0'){
+                //std::cout<<std::string(p)<<" ";
+                keyval.fid = h(std::string(p));
+                sample.push_back(keyval);
+                p = q;
+                break;
+            }
             *q = '\0';
+	    //std::cout<<std::string(p)<<" ";
 	    keyval.fid = h(std::string(p));
-	    p = q + 1; 
             sample.push_back(keyval);
+            ++q;
+	    p = q; 
         }//end while(*q != '\n')
-        p = q + 1;
+        //std::cout<<"================================"<<std::endl;
         fea_matrix.push_back(sample);
+        //break;
     }//end while(*p != '\0')
+    //std::cout<<"------------------------------"<<std::endl;
 }//load_minibatch_hash_data_fread
 
 }//end namespace

@@ -44,6 +44,8 @@ class IO{
         char fid_str[1024];
         std::hash<std::string> h;
 
+        size_t bmax = 0, btop = 0;
+        int buffer_size = 0;
         int nchar;
         float y;
 };

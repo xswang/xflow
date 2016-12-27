@@ -39,7 +39,7 @@ class Worker : public ps::App{
             train_file_path(train_file), test_file_path(test_file){ 
         }
         ~Worker(){
-            delete train_data;
+            //delete train_data;
         } 
  
         virtual void ProcessRequest(ps::Message* request){
@@ -219,7 +219,7 @@ class Worker : public ps::App{
             std::cout<<"load kafka data end"<<std::endl;
             return;
             */
-            train_data = new dml::LoadData(train_data_path);
+            train_data = new dml::LoadData(train_data_path, 1);
             train_data->load_all_data();
             ThreadPool pool(core_num);
             
@@ -279,7 +279,7 @@ class Worker : public ps::App{
             clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
             pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
 
-            auto wx = std::vector<float>(end - start + 1);
+            auto wx = std::vector<float>(end - start);
             for(int j = 0, i = 0; j < all_keys.size();){
                 size_t allkeys_fid = all_keys[j].fid;
                 size_t weight_fid = (*unique_keys)[i];
@@ -290,7 +290,6 @@ class Worker : public ps::App{
                 else if(allkeys_fid > weight_fid){ 
                     ++i;
                 }
-		//std::cout<<"i = "<<i<<" j = "<<j<<std::endl;
             }//end for
             
             for(int i = 0; i < wx.size(); i++){
@@ -332,14 +331,14 @@ class Worker : public ps::App{
             ThreadPool pool(core_num);
             timespec allstart, allend, allelapsed;
             for(int epoch = 0; epoch < epochs; ++epoch){
-                train_data = new dml::LoadData(train_data_path);
+                train_data = new dml::LoadData(train_data_path, block_size<<20);
                 clock_gettime(CLOCK_MONOTONIC, &allstart);
                 send_key_numbers = 0;
 		int block = 0;
                 while(1){
-                    train_data->load_mibibatch_hash_data(block_size);
-		    std::cout<<"rank "<<rank<<" block "<<block<<" size "<<block_size<<std::endl;
-                    if(train_data->fea_matrix.size() < block_size) break;
+                    train_data->load_minibatch_hash_data_fread();
+		    std::cout<<"rank "<<rank<<" block "<<block<<" sample num "<<train_data->fea_matrix.size()<<std::endl;
+                    if(train_data->fea_matrix.size() <= 0) break;
                     thread_size = train_data->fea_matrix.size() / core_num;
 		    thread_finish_num = core_num;
                     for(int i = 0; i < core_num; ++i){
@@ -352,11 +351,12 @@ class Worker : public ps::App{
 			//std::cout<<"thread_finish_num = "<<thread_finish_num<<std::endl;
 			usleep(10);
 		    }
+		    std::cout<<"---------------------------"<<std::endl;
                 }
                 clock_gettime(CLOCK_MONOTONIC, &allend);
                 allelapsed = time_diff(allstart, allend);
-                std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
-                std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
+                //std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
+                //std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
 		delete train_data;
             }//end for all epoch
         }//end batch_learning_threadpool
@@ -377,9 +377,9 @@ class Worker : public ps::App{
         int core_num;
         int batch_num;
         int call_back = 1;
-        int block_size = 32000;
+        int block_size = 200;
         int thread_size;
-        int epochs = 10;
+        int epochs = 1;
         int calculate_gradient_thread_count;
 
         std::atomic_llong num_batch_fly = {0};
