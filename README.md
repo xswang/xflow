@@ -4,7 +4,7 @@ Distributed LR With Parameter Server
 
 2. Install
 
-step 1. in the fold of logistic-regression-ftrl-ps 
+step 1. in the fold of Field-aware-Factorization-Machine-ps 
 
     cd ps-lite
 
@@ -20,7 +20,7 @@ step 2.
 
 step 3.
 
-    cd logistic-regression-ftrl-ps
+    cd Field-aware-Factorization-Machine-ps
 
     make
     
