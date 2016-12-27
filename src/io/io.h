@@ -25,6 +25,7 @@ class IO{
             }else{
                 std::cout<<"open file "<<file_path<<" sucess! "<<std::endl;
             }
+            fp_ = fopen(file_path, "r"); 
         }
 
         virtual void load_all_data() = 0;
@@ -32,6 +33,7 @@ class IO{
 
     public:
         std::ifstream fin_;
+        FILE *fp_;
         std::string line;
         typedef kv key_val;
         const char *file_path;
