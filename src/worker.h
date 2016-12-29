@@ -71,6 +71,7 @@ class Worker : public ps::App{
 	    test_data = new dml::LoadData(test_data_path, ((size_t)1)<<30);
             std::cout<<"alloc 1GB memory sucess!"<<std::endl;
             std::vector<auc_key> test_auc_vec;
+	    test_auc_vec.clear();
 	    while(true){
 		test_data->load_minibatch_hash_data_fread();
 		std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
@@ -116,12 +117,12 @@ class Worker : public ps::App{
 		    ak.label = test_data->label[i];
 		    ak.pctr = pctr;
 		    test_auc_vec.push_back(ak);
-                    md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
+                    //md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
 	        }
             }//end while
             md.close();
 	    std::sort(test_auc_vec.begin(), test_auc_vec.end(), [](const auc_key& a, const auc_key& b){
-		return a.pctr > b.pctr;
+		return a.pctr < b.pctr;
 	    });
 	    float area = 0.0; int tp_n = 0;
 	    for(size_t i = 0; i < test_auc_vec.size(); ++i){
@@ -366,19 +367,15 @@ class Worker : public ps::App{
         }
 
         void batch_learning_threadpool(int core_num){
-	    //core_num = 1;
             ThreadPool pool(core_num);
             timespec allstart, allend, allelapsed;
             for(int epoch = 0; epoch < epochs; ++epoch){
-		//block_size = 2;
-                //train_data = new dml::LoadData(train_data_path, block_size<<3);
                 train_data = new dml::LoadData(train_data_path, block_size<<20);
                 clock_gettime(CLOCK_MONOTONIC, &allstart);
                 send_key_numbers = 0;
 		int block = 0;
                 while(1){
                     train_data->load_minibatch_hash_data_fread();
-		    //std::cout<<"rank "<<rank<<" block "<<block<<" sample num "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() <= 0) break;
                     thread_size = train_data->fea_matrix.size() / core_num;
 		    thread_finish_num = core_num;
@@ -392,7 +389,7 @@ class Worker : public ps::App{
 		    }
 		    if((block + 1) % 100 == 0){
 		        std::sort(auc_vec.begin(), auc_vec.end(), [](const auc_key& a, const auc_key& b){
-			    return a.pctr > b.pctr;
+			    return a.pctr < b.pctr;
 		        });
 		        float area = 0.0; int tp_n = 0;
 		        for(size_t i = 0; i < auc_vec.size(); ++i){
@@ -402,7 +399,6 @@ class Worker : public ps::App{
 		        if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
 			else{
 		            area /= (tp_n * (auc_vec.size() - tp_n));
-			    area = area < 0.5 ? 1 - area : area;
 			    std::cout<<"auc = "<<area<<std::endl;
 			    auc_vec.clear();
                         }
@@ -410,14 +406,13 @@ class Worker : public ps::App{
                         logloss = 0.0;
 			rmse = 0.0;
 		    }//end if(block)
+		    if((rank == 0) && ((block + 1) % 200 == 0)) predict(rank);
 		    ++block;
-		    //std::cout<<"---------------------------"<<std::endl;
                 }//end while
-		predict(rank);
                 clock_gettime(CLOCK_MONOTONIC, &allend);
                 allelapsed = time_diff(allstart, allend);
-                //std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
-                //std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
+                std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
+                std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
 		delete train_data;
             }//end for all epoch
         }//end batch_learning_threadpool
