@@ -104,6 +104,7 @@ class Worker : public ps::App{
 		    mutex.unlock();
                     //md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
                 }
+		--calculate_pctr_thread_finish_num;
 	}
 
         void predict(ThreadPool &pool, int rank){
@@ -115,20 +116,21 @@ class Worker : public ps::App{
             if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
 
 	    snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-	    test_data = new dml::LoadData(test_data_path, ((size_t)1)<<30);
-            std::cout<<"alloc 1GB memory sucess!"<<std::endl;
+	    test_data = new dml::LoadData(test_data_path, ((size_t)4)<<30);
+            std::cout<<"alloc 4GB memory sucess!"<<std::endl;
 	    test_auc_vec.clear();
 	    while(true){
 		test_data->load_minibatch_hash_data_fread();
 		std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
-	        if(test_data->fea_matrix.size() <= 1) break;
+	        if(test_data->fea_matrix.size() <= core_num * 5) break;
 		int thread_size = train_data->fea_matrix.size() / core_num;
-		int thread_finish_num = core_num;
+		calculate_pctr_thread_finish_num = core_num;
                 for(int i = 0; i < core_num; ++i){
                     int start = i * thread_size;
                     int end = (i + 1)* thread_size;
                     pool.enqueue(std::bind(&Worker::calculate_pctr, this, start, end));
                 }//end all batch
+		while(calculate_pctr_thread_finish_num > 0) usleep(10);
             }//end while
 	    delete test_data;
             md.close();
@@ -325,16 +327,16 @@ class Worker : public ps::App{
                 pctr = sigmoid(wx[i]);
 		int l = train_data->label[start];
                 float loss = pctr - train_data->label[start++];
+		/*
                 mutex.lock();
 		logloss += l*log(pctr) + (1-l)*log(1-pctr); 
 	        rmse += loss * loss;
-                /*
 		auc_key ak;
                 ak.label = l;
 		ak.pctr = pctr;
 		auc_vec.push_back(ak); 
-		*/
 		mutex.unlock();
+		*/
                 wx[i] = loss;
             }
 
@@ -364,7 +366,7 @@ class Worker : public ps::App{
             all_pull_time += pull_elapsed_time.tv_sec * 1e9 + pull_elapsed_time.tv_nsec;
             all_push_time += push_elapsed_time.tv_sec * 1e9 + push_elapsed_time.tv_nsec;
             send_key_numbers += keys_size;
-	    --thread_finish_num;
+	    --calculate_batch_gradient_thread_finish_num;
         }
 
 	void calculate_auc(std::vector<auc_key>& auc_vec){
@@ -396,22 +398,22 @@ class Worker : public ps::App{
                     train_data->load_minibatch_hash_data_fread();
                     if(train_data->fea_matrix.size() <= 0) break;
                     thread_size = train_data->fea_matrix.size() / core_num;
-		    thread_finish_num = core_num;
+		    calculate_batch_gradient_thread_finish_num = core_num;
                     for(int i = 0; i < core_num; ++i){
                         int start = i * thread_size;
                         int end = (i + 1)* thread_size;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient_threadpool, this, start, end));
                     }//end all batch
-	 	    while(thread_finish_num > 0){
+	 	    while(calculate_batch_gradient_thread_finish_num > 0){
 			usleep(10);
 		    }
-		    if((block + 1) % 100 == 0){
+		    if((block + 1) % 50 == 0){
 			//calculate_auc(auc_vec);
-                        std::cout<<"rank "<<rank<<"logloss = "<<logloss * -1.0 /train_data->fea_matrix.size()<<"\trmse = "<<sqrt(rmse) * 1.0 / train_data->fea_matrix.size()<<std::endl;
+                        //std::cout<<"rank "<<rank<<" logloss = "<<logloss * -1.0 /train_data->fea_matrix.size()<<"\trmse = "<<sqrt(rmse) * 1.0 / train_data->fea_matrix.size()<<std::endl;
                         logloss = 0.0;
 			rmse = 0.0;
+		    	if(rank == 0) predict(pool, rank);
 		    }//end if(block)
-		    if((rank == 0) && ((block + 1) % 200 == 0)) predict(pool, rank);
 		    ++block;
                 }//end while
                 clock_gettime(CLOCK_MONOTONIC, &allend);
@@ -448,7 +450,8 @@ class Worker : public ps::App{
         std::atomic_llong all_push_time = {0};
         std::atomic_llong all_pull_time = {0};
         std::atomic_llong send_key_numbers = {0};
-	std::atomic_llong thread_finish_num = {0};
+	std::atomic_llong calculate_batch_gradient_thread_finish_num = {0};
+	std::atomic_llong calculate_pctr_thread_finish_num = {0};
 	float logloss = 0.0;
         float rmse = 0.0;
 	std::vector<auc_key> auc_vec;
