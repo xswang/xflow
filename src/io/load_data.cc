@@ -45,6 +45,26 @@ void LoadData::load_minibatch_data(int num){
     }
 }
 
+void LoadData::load_all_hash_data(){
+    fea_matrix.clear();
+    while(!fin_.eof()){
+        std::getline(fin_, line);
+        sample.clear();
+        const char *pline = line.c_str();
+        if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
+            pline += nchar;
+            label.push_back(y);
+            while(sscanf(pline, "%s", fid_str) >= 1){
+                pline += nchar;
+                keyval.fid = h(fid_str);
+                sample.push_back(keyval);
+            }
+        }
+        fea_matrix.push_back(sample);
+    }
+    std::cout<<"size : "<<fea_matrix.size()<<std::endl;
+}
+
 void LoadData::load_mibibatch_hash_data(int num){
     fea_matrix.clear();
     for(int i = 0; i < num; ++i){
@@ -66,6 +86,7 @@ void LoadData::load_mibibatch_hash_data(int num){
 }
 
 void LoadData::load_minibatch_hash_data_fread(){
+    label.clear();
     fea_matrix.clear();
     if(bmax < btop){
 	memmove(&buf[0], &buf[bmax], (btop - bmax) * sizeof(char));
@@ -90,7 +111,7 @@ void LoadData::load_minibatch_hash_data_fread(){
     else {
         buf[bmax] = '\0';	
     } 
-    std::cout<<"bmax = "<<bmax<<std::endl;
+    //std::cout<<"bmax = "<<bmax<<std::endl;
  
     char *p = &buf[0];
     //std::cout<<"fisrt buf *p = "<<std::string(p)<<std::endl;
@@ -100,7 +121,7 @@ void LoadData::load_minibatch_hash_data_fread(){
         *q = '\0';
         y = std::atoi(p);
         label.push_back(y);
-        //std::cout<<"y = "<<y<<std::endl;
+        //if(y != 0)std::cout<<"y="<<y<<std::endl;
         ++q;
         p = q;
         sample.clear();

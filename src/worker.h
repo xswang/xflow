@@ -66,49 +66,74 @@ class Worker : public ps::App{
             std::ofstream md;
             md.open("pred_" + filename + ".txt");
             if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
-            std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
-            auto all_keys = std::vector<sample_key>();
-            auto unique_keys = std::make_shared<std::vector<ps::Key>>();
-            int line_num = 0;
-            
-            for(int row = 0; row < test_data->fea_matrix.size(); ++row) {
-                int sample_size = test_data->fea_matrix[row].size();
-		sample_key sk;
- 		sk.sid = line_num;
-                for(int j = 0; j < sample_size; ++j) {
-                    size_t idx = h(test_data->fea_matrix[row][j].fid);
- 		    sk.fid = idx;
-		    all_keys.push_back(sk);
-                    (*unique_keys).push_back(idx); 
-                }
-                ++line_num;
-            }
-            std::sort(all_keys.begin(), all_keys.end(), Worker::sort_finder);
-	    std::sort((*unique_keys).begin(), (*unique_keys).end());
-            (*unique_keys).erase(unique((*unique_keys).begin(), (*unique_keys).end()), (*unique_keys).end());
-   	    auto w = std::make_shared<std::vector<float>>();
-            int keys_size = (*unique_keys).size();
-            kv_.Wait(kv_.ZPull(unique_keys, &(*w)));
-            auto wx = std::vector<float>(line_num);
-           
-            for(int j = 0, i = 0; j < all_keys.size();){
-		int allkeys_fid = all_keys[j].fid;
-		int weight_fid = (*unique_keys)[i];
-		if(allkeys_fid == weight_fid){
-		    wx[all_keys[j].sid] += (*w)[i];
- 	 	    ++j;
-		}
-		else if(allkeys_fid > weight_fid){
-		    ++i;
-		}
-            }
 
- 	    for(int i = 0; i < wx.size(); ++i){
-		float pctr = sigmoid(wx[i]);
-                md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
+	    snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
+	    test_data = new dml::LoadData(test_data_path, ((size_t)1)<<30);
+            std::cout<<"alloc 1GB memory sucess!"<<std::endl;
+            std::vector<auc_key> test_auc_vec;
+	    while(true){
+		test_data->load_minibatch_hash_data_fread();
+		std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
+	        if(test_data->fea_matrix.size() <= 1) break;
+		auto all_keys = std::vector<sample_key>();
+		auto unique_keys = std::make_shared<std::vector<ps::Key>>();
+		int line_num = 0;
+
+		for(int row = 0; row < test_data->fea_matrix.size(); ++row) {
+		    int sample_size = test_data->fea_matrix[row].size();
+		    sample_key sk;
+		    sk.sid = line_num;
+                    for(int j = 0; j < sample_size; ++j) {
+                        size_t idx = h(test_data->fea_matrix[row][j].fid);
+ 		        sk.fid = idx;
+		        all_keys.push_back(sk);
+                        (*unique_keys).push_back(idx); 
+                    }
+                    ++line_num;
+                }
+		std::sort(all_keys.begin(), all_keys.end(), Worker::sort_finder);
+		std::sort((*unique_keys).begin(), (*unique_keys).end());
+		(*unique_keys).erase(unique((*unique_keys).begin(), (*unique_keys).end()), (*unique_keys).end());
+		auto w = std::make_shared<std::vector<float>>();
+		int keys_size = (*unique_keys).size();
+		kv_.Wait(kv_.ZPull(unique_keys, &(*w)));
+		auto wx = std::vector<float>(line_num);
+
+		for(int j = 0, i = 0; j < all_keys.size();){
+		    size_t allkeys_fid = all_keys[j].fid;
+		    size_t weight_fid = (*unique_keys)[i];
+		    if(allkeys_fid == weight_fid){
+		        wx[all_keys[j].sid] += (*w)[i];
+ 	 	        ++j;
+		    }
+		    else if(allkeys_fid > weight_fid){
+		        ++i;
+		    }
+                }
+ 	        for(int i = 0; i < wx.size(); ++i){
+	    	    float pctr = sigmoid(wx[i]);
+		    auc_key ak;
+		    ak.label = test_data->label[i];
+		    ak.pctr = pctr;
+		    test_auc_vec.push_back(ak);
+                    md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
+	        }
+            }//end while
+            md.close();
+	    std::sort(test_auc_vec.begin(), test_auc_vec.end(), [](const auc_key& a, const auc_key& b){
+		return a.pctr > b.pctr;
+	    });
+	    float area = 0.0; int tp_n = 0;
+	    for(size_t i = 0; i < test_auc_vec.size(); ++i){
+		if(test_auc_vec[i].label > 0) tp_n += 1;
+		else area += tp_n; 
 	    }
-           md.close();
-        } 
+	    if(tp_n == 0 || tp_n == test_auc_vec.size()) std::cout<<"test tp_n = "<<tp_n<<std::endl;
+ 	    else{
+		area /= (tp_n * (test_auc_vec.size() - tp_n));
+		std::cout<<"test auc = "<<area<<std::endl;
+	    }
+        }//end predict 
 
         inline void filter_zero_element(std::vector<float>& gradient, std::vector<ps::Key>& nonzero_index, std::vector<float>& nonzero_gradient){
             for(int i = 0; i < init_index.size(); i++){
@@ -209,7 +234,7 @@ class Worker : public ps::App{
                 pool.enqueue(std::bind(&Worker::zpush_callback, this, all_keys, unique_keys, w, start, end));
             };
             kv_.ZPull(unique_keys, &(*w), pull_callback);
-        }
+        }//calculate_batch_gradient_callback
 
         void batch_learning_callback(int core_num){
             /*
@@ -246,7 +271,12 @@ class Worker : public ps::App{
                 std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
                 std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
             }//end all epoch
-        }
+        }//end batch_learning_callback
+
+        struct auc_key{
+	    int label;
+	    float pctr;
+	};
 
         void calculate_batch_gradient_threadpool(int start, int end){
             timespec all_start, all_end, all_elapsed_time;
@@ -291,10 +321,18 @@ class Worker : public ps::App{
                     ++i;
                 }
             }//end for
-            
             for(int i = 0; i < wx.size(); i++){
                 pctr = sigmoid(wx[i]);
+		int l = train_data->label[start];
                 float loss = pctr - train_data->label[start++];
+                mutex.lock();
+		logloss += l*log(pctr) + (1-l)*log(1-pctr); 
+	        rmse += loss * loss;
+		auc_key ak;
+                ak.label = l;
+		ak.pctr = pctr;
+		auc_vec.push_back(ak); 
+		mutex.unlock();
                 wx[i] = loss;
             }
 
@@ -328,16 +366,19 @@ class Worker : public ps::App{
         }
 
         void batch_learning_threadpool(int core_num){
+	    //core_num = 1;
             ThreadPool pool(core_num);
             timespec allstart, allend, allelapsed;
             for(int epoch = 0; epoch < epochs; ++epoch){
+		//block_size = 2;
+                //train_data = new dml::LoadData(train_data_path, block_size<<3);
                 train_data = new dml::LoadData(train_data_path, block_size<<20);
                 clock_gettime(CLOCK_MONOTONIC, &allstart);
                 send_key_numbers = 0;
 		int block = 0;
                 while(1){
                     train_data->load_minibatch_hash_data_fread();
-		    std::cout<<"rank "<<rank<<" block "<<block<<" sample num "<<train_data->fea_matrix.size()<<std::endl;
+		    //std::cout<<"rank "<<rank<<" block "<<block<<" sample num "<<train_data->fea_matrix.size()<<std::endl;
                     if(train_data->fea_matrix.size() <= 0) break;
                     thread_size = train_data->fea_matrix.size() / core_num;
 		    thread_finish_num = core_num;
@@ -346,13 +387,33 @@ class Worker : public ps::App{
                         int end = (i + 1)* thread_size;
                         pool.enqueue(std::bind(&Worker::calculate_batch_gradient_threadpool, this, start, end));
                     }//end all batch
-		    ++block;
 	 	    while(thread_finish_num > 0){
-			//std::cout<<"thread_finish_num = "<<thread_finish_num<<std::endl;
 			usleep(10);
 		    }
-		    std::cout<<"---------------------------"<<std::endl;
-                }
+		    if((block + 1) % 100 == 0){
+		        std::sort(auc_vec.begin(), auc_vec.end(), [](const auc_key& a, const auc_key& b){
+			    return a.pctr > b.pctr;
+		        });
+		        float area = 0.0; int tp_n = 0;
+		        for(size_t i = 0; i < auc_vec.size(); ++i){
+			    if(auc_vec[i].label > 0) tp_n += 1;
+			    else area += tp_n;
+		        }
+		        if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
+			else{
+		            area /= (tp_n * (auc_vec.size() - tp_n));
+			    area = area < 0.5 ? 1 - area : area;
+			    std::cout<<"auc = "<<area<<std::endl;
+			    auc_vec.clear();
+                        }
+                        std::cout<<"logloss = "<<logloss * -1.0 /train_data->fea_matrix.size()<<"\trmse = "<<sqrt(rmse) * 1.0 / train_data->fea_matrix.size()<<std::endl;
+                        logloss = 0.0;
+			rmse = 0.0;
+		    }//end if(block)
+		    ++block;
+		    //std::cout<<"---------------------------"<<std::endl;
+                }//end while
+		predict(rank);
                 clock_gettime(CLOCK_MONOTONIC, &allend);
                 allelapsed = time_diff(allstart, allend);
                 //std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
@@ -379,7 +440,7 @@ class Worker : public ps::App{
         int call_back = 1;
         int block_size = 200;
         int thread_size;
-        int epochs = 1;
+        int epochs = 100;
         int calculate_gradient_thread_count;
 
         std::atomic_llong num_batch_fly = {0};
@@ -388,7 +449,10 @@ class Worker : public ps::App{
         std::atomic_llong all_pull_time = {0};
         std::atomic_llong send_key_numbers = {0};
 	std::atomic_llong thread_finish_num = {0};
-      
+	float logloss = 0.0;
+        float rmse = 0.0;
+	std::vector<auc_key> auc_vec;
+
         std::hash<size_t> h;
         
         std::mutex mutex;
