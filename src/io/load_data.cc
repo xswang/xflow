@@ -121,6 +121,7 @@ void LoadData::load_minibatch_hash_data_fread(){
         *q = '\0';
         float y_tmp = std::atof(p);
 	if(y_tmp > 0.0000001) y = 1;
+	else y = 0;
         label.push_back(y);
         //if(y != 0)std::cout<<"y="<<y<<std::endl;
         ++q;
