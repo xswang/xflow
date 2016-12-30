@@ -5,7 +5,7 @@ namespace dmlc{
 struct ISGDHandle{
       public:
         ISGDHandle(){ ns_ = ps::NodeInfo::NumServers();}
-        float alpha = 1.0, beta = 1.0, lambda1 = 0.001, lambda2 = 0.0;
+        float alpha = .01, beta = 1.0, lambda1 = 0.0, lambda2 = 0.0;
         inline void Start(bool push, int timestamp, int cmd, void* msg) { }//must has
         void Load(Stream* fi) { }//must has
         void Save(Stream *fo) const { }//must has
