@@ -166,7 +166,7 @@ class Worker : public ps::App{
 		test_data->load_minibatch_hash_data_fread();
 		std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
 	        if(test_data->fea_matrix.size() <= 0) break;
-		int thread_size = train_data->fea_matrix.size() / core_num;
+		int thread_size = test_data->fea_matrix.size() / core_num;
 		calculate_pctr_thread_finish_num = core_num;
                 for(int i = 0; i < core_num; ++i){
                     int start = i * thread_size;
@@ -174,8 +174,10 @@ class Worker : public ps::App{
                     pool.enqueue(std::bind(&Worker::calculate_pctr, this, start, end));
                 }//end all batch
 		while(calculate_pctr_thread_finish_num > 0) usleep(10);
+		std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
             }//end while
 	    delete test_data;
+	    std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
 	    calculate_auc(test_auc_vec);
             md.close();
         }//end predict 
