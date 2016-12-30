@@ -97,7 +97,7 @@ class Worker : public ps::App{
             if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
             else{
                 area /= (tp_n * (auc_vec.size() - tp_n));
-                std::cout<<"auc = "<<area<<std::endl;
+                std::cout<<"auc = "<<area<<"\ttp = "<<tp_n<<" fp = "<<(auc_vec.size() - tp_n)<<std::endl;
             }
             auc_vec.clear();
         }
@@ -368,7 +368,7 @@ class Worker : public ps::App{
                 while(1){
                     train_data->load_minibatch_hash_data_fread();
                     if(train_data->fea_matrix.size() <= 0) break;
-                    thread_size = train_data->fea_matrix.size() / core_num;
+                    int thread_size = train_data->fea_matrix.size() / core_num;
 		    calculate_batch_gradient_thread_finish_num = core_num;
                     for(int i = 0; i < core_num; ++i){
                         int start = i * thread_size;
@@ -378,10 +378,10 @@ class Worker : public ps::App{
 	 	    while(calculate_batch_gradient_thread_finish_num > 0){
 			usleep(10);
 		    }
+		    if((rank == 0) && ((block + 1) % 20 == 0)) predict(pool, rank);
 		    ++block;
                 }//end while one epoch
 		delete train_data;
-		if(rank == 0) predict(pool, rank);
             }//end for all epoch
         }//end batch_learning_threadpool
 
@@ -401,9 +401,7 @@ class Worker : public ps::App{
         int batch_num;
         int call_back = 1;
         int block_size = 200;
-        int thread_size;
         int epochs = 100;
-        int calculate_gradient_thread_count;
 
         std::atomic_llong num_batch_fly = {0};
         std::atomic_llong all_time = {0};
@@ -412,15 +410,13 @@ class Worker : public ps::App{
         std::atomic_llong send_key_numbers = {0};
 	std::atomic_llong calculate_batch_gradient_thread_finish_num = {0};
 	std::atomic_llong calculate_pctr_thread_finish_num = {0};
+
 	float logloss = 0.0;
         float rmse = 0.0;
 	std::vector<auc_key> auc_vec;
 	std::vector<auc_key> test_auc_vec;
 
-        std::hash<size_t> h;
-        
         std::mutex mutex;
-        std::vector<ps::Key> init_index;
         dml::LoadData *train_data;
         dml::LoadData *test_data;
         //dml::LoadData_from_kafka *train_data_kafka;
