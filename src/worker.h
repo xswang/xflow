@@ -91,15 +91,15 @@ class Worker : public ps::App{
             float area = 0.0; 
 	    int tp_n = 0;
             for(size_t i = 0; i < auc_vec.size(); ++i){
-                if(auc_vec[i].label > 0) tp_n += 1;
+		if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<" auc_pctr = "<<auc_vec[i].pctr<<std::endl;
+                if(auc_vec[i].label == 1) tp_n += 1;
                 else area += tp_n;
             }
             if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
             else{
-                area /= (tp_n * (auc_vec.size() - tp_n));
+                area /= 1.0 * (tp_n * (auc_vec.size() - tp_n));
                 std::cout<<"auc = "<<area<<"\ttp = "<<tp_n<<" fp = "<<(auc_vec.size() - tp_n)<<std::endl;
             }
-            auc_vec.clear();
         }
 
 	void calculate_pctr(int start, int end){
@@ -138,23 +138,23 @@ class Worker : public ps::App{
                 }
             }
             for(int i = 0; i < wx.size(); ++i){
-                float pctr = sigmoid(-1.0 * wx[i]);
+                float pctr = sigmoid(wx[i]);
+		//std::cout<<"wx[i] = "<<wx[i]<<" sigmoid = "<<pctr<<std::endl;
                 auc_key ak;
                 ak.label = test_data->label[start++];
                 ak.pctr = pctr;
 		mutex.lock();
                 test_auc_vec.push_back(ak);
+                md<<pctr<<"\t"<<1 - ak.label<<"\t"<<ak.label<<std::endl;
 		mutex.unlock();
-                //md<<pctr<<"\t"<<1 - test_data->label[i]<<"\t"<<test_data->label[i]<<std::endl;
             }
 	    --calculate_pctr_thread_finish_num;
 	}//calculate_pctr
 
-        void predict(ThreadPool &pool, int rank){
+        void predict(ThreadPool &pool, int rank, int block){
 	    char buffer[1024];
-            snprintf(buffer, 1024, "%d", rank);
+            snprintf(buffer, 1024, "%d_%d", rank, block);
             std::string filename = buffer;
-            std::ofstream md;
             md.open("pred_" + filename + ".txt");
             if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
 
@@ -176,10 +176,11 @@ class Worker : public ps::App{
 		while(calculate_pctr_thread_finish_num > 0) usleep(10);
 		std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
             }//end while
+            md.close();
 	    delete test_data;
 	    std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
+	    std::cout<<"block="<<block<<" ";
 	    calculate_auc(test_auc_vec);
-            md.close();
         }//end predict 
 
         void zpush_callback(std::vector<sample_key> all_keys, std::shared_ptr<std::vector<ps::Key>> unique_keys, std::shared_ptr<std::vector<float>> w, int start, int end){
@@ -197,7 +198,7 @@ class Worker : public ps::App{
             }
 
             for(int i = 0; i < wx.size(); i++){
-                float pctr = sigmoid(-1.0 * wx[i]);
+                float pctr = sigmoid(wx[i]);
                 float loss = pctr - train_data->label[start++];
                 wx[i] = loss;
             }
@@ -326,8 +327,7 @@ class Worker : public ps::App{
                 }
             }//end for
             for(int i = 0; i < wx.size(); i++){
-                pctr = sigmoid(-1.0 * wx[i]);
-		int l = train_data->label[start];
+                pctr = sigmoid(wx[i]);
                 float loss = pctr - train_data->label[start++];
                 wx[i] = loss;
             }
@@ -344,6 +344,9 @@ class Worker : public ps::App{
                 else if(allkeys_fid > gradient_fid){
                     ++i;
                 }
+            }
+            for(size_t i = 0; i < (*push_gradient).size(); ++i){
+                (*push_gradient)[i] /= 1.0 * line_num;
             }
             
             timespec push_start_time, push_end_time, push_elapsed_time;
@@ -380,9 +383,10 @@ class Worker : public ps::App{
 	 	    while(calculate_batch_gradient_thread_finish_num > 0){
 			usleep(10);
 		    }
-		    if((rank == 0) && ((block + 1) % 20 == 0)) predict(pool, rank);
+		    if((rank == 0) && ((block + 1) % 300 == 0)) predict(pool, rank, block);
 		    ++block;
                 }//end while one epoch
+		//predict(pool, rank, epoch);
 		delete train_data;
             }//end for all epoch
         }//end batch_learning_threadpool
@@ -402,7 +406,7 @@ class Worker : public ps::App{
         int core_num;
         int batch_num;
         int call_back = 1;
-        int block_size = 200;
+        int block_size = 20;
         int epochs = 100;
 
         std::atomic_llong num_batch_fly = {0};
@@ -418,6 +422,7 @@ class Worker : public ps::App{
 	std::vector<auc_key> auc_vec;
 	std::vector<auc_key> test_auc_vec;
 
+        std::ofstream md;
         std::mutex mutex;
         dml::LoadData *train_data;
         dml::LoadData *test_data;
