@@ -1,5 +1,7 @@
 #include "iostream"
 #include "ps.h"
+#include "dmlc/io.h"
+#include <time.h>
 
 namespace dmlc{
 
@@ -26,11 +28,49 @@ struct IterCmd : public DataParCmd {
   int iter() const { return (cmd >> 16)-1; }
 };
 
+class Scheduler : public ps::App{
+    public:
+        Scheduler(){}
+        ~Scheduler(){}
+
+	    virtual void ProcessResponse(ps::Message* response) { }
+	    virtual bool Run(){
+	        std::cout<<"Connected "<<ps::NodeInfo::NumServers()<<" servers and "<<ps::NodeInfo::NumWorkers()<<" workers"<<std::endl;
+
+            time_t tt = time(NULL);
+            tm* t = localtime(&tt);
+            char now_time[1024];
+            int iterator = 0;
+            while(1){
+                usleep(300 * 1e6);
+                snprintf(now_time, 1024, "%d-%02d-%02d %02d:%02d:%02d", t->tm_year + 1900,
+                                                                        t->tm_mon + 1,
+                                                                        t->tm_mday,
+                                                                        t->tm_hour,
+                                                                        t->tm_min,
+                                                                        t->tm_sec);
+                std::string timestamp;
+                timestamp = std::string(now_time);
+                if(iterator % 5 == 0)SaveModel("model", iterator);
+                iterator++;
+            }
+	    }
+
+	    int SaveModel(const std::string& filename, int iter) {
+            IterCmd cmd;
+            cmd.set_save_model(); 
+            cmd.set_iter(iter);
+            ps::Task task; 
+            task.set_cmd(cmd.cmd); 
+            task.set_msg(filename);
+            Submit(task, ps::kServerGroup);
+        }
+};//end class Scheduler
 
 struct ISGDHandle{
       public:
         ISGDHandle(){ ns_ = ps::NodeInfo::NumServers();}
-        float alpha = 0.05, beta = 0.1, lambda1 = 50.0, lambda2 = 0.0;
+        float alpha = 0.01, beta = 0.1, lambda1 = 5.0, lambda2 = 0.0;
         inline void Start(bool push, int timestamp, int cmd, void* msg) { }//must has
         void Load(Stream* fi) { }//must has
         void Save(Stream *fo) const { }//must has
@@ -59,13 +99,8 @@ struct FTRLEntry{
 
 struct FTRLHandle : public ISGDHandle{
     public:
-	int SaveModel(const std::string& filename, int iter) {
-            IterCmd cmd; cmd.set_save_model(); cmd.set_iter(iter);
-            ps::Task task; task.set_cmd(cmd.cmd); task.set_msg(filename);
-            //ps::Submit(task, ps::kServerGroup);
-        }
         inline void Push(ps::Key key, ps::Blob<const float> grad, FTRLEntry& val){
-	    float g = grad[0];
+	        float g = grad[0];
             float sqrt_n = val.sq_cum_grad;
             float sqrt_n_new = sqrt(sqrt_n * sqrt_n + g * g);
             val.z += g - (sqrt_n_new - sqrt_n) / alpha * val.w;
@@ -80,8 +115,6 @@ struct FTRLHandle : public ISGDHandle{
                 float tmpl = -1 * ( (beta + val.sq_cum_grad)/alpha  + lambda2 );
                 val.w = tmpr / tmpl;
             }
-	    ++cur_iter;
-	    if(cur_iter % 10 == 0) SaveModel("tmp.txt", cur_iter);
         }//end Push
 
 	inline void Pull(ps::Key key, const FTRLEntry& val, ps::Blob<float>& send){
@@ -102,9 +135,31 @@ class Server : public ps::App{
         void CreateServer(){
             Handle h;
             ps::OnlineServer<float, Entry, Handle> s(h, 1, 32);
+            server_ = s.server();
         }
 
-        virtual void ProcessRequest(ps::Message* request) { }
+        void ProcessRequest(ps::Message* request) { 
+            std::cout<<"server ProcessRequest "<<std::endl;
+            if(request->task.msg().size() == 0) return;
+            IterCmd cmd(request->task.cmd());
+            auto filename = ModelName(request->task.msg(), cmd.iter());
+            if(cmd.save_model()){
+                Stream* fo = Stream::Create(filename.c_str(), "w"); 
+                server_->Save(fo);
+                delete fo;
+            }else if(cmd.load_model()){
+                Stream* fi = Stream::Create(filename.c_str(), "r");
+                server_->Load(fi);
+                delete fi;
+            }
+        }
+        ps::KVStore* server_;
+    private:
+        std::string ModelName(const std::string& base, int iter){
+            std::string name = base;
+            if(iter >= 0) name += "_iter_" + std::to_string(iter);
+            return name + "_part_" + std::to_string(ps::NodeInfo::MyRank());
+        }
 };//end class Server
 
 }//end dmlc

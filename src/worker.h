@@ -9,7 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <memory>
-#include <pmmintrin.h>
+//#include <pmmintrin.h>
 #include <immintrin.h>
 #include "sparsehash_memory/sparsepp.h"
 
@@ -406,8 +406,8 @@ class Worker : public ps::App{
         int core_num;
         int batch_num;
         int call_back = 1;
-        int block_size = 20;
-        int epochs = 100;
+        int block_size = 2;
+        int epochs = 10000;
 
         std::atomic_llong num_batch_fly = {0};
         std::atomic_llong all_time = {0};
