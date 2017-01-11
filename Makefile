@@ -1,27 +1,34 @@
 #!/bin/bash
 CPP = g++
-CPP_tag = -std=c++11
-DEPS_PATH = ./ps-lite/deps 
-INCLUDE = -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc
+CPP_tag = -std=c++11 -g -O3 -msse3
 
-#LDFLAGS = $(addprefix $(DEPS_PATH)/lib/, libglog.a libprotobuf.a libgflags.a libzmq.a libcityhash.a liblz4.a)
-LDFLAGS = ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a ./ps-lite/deps/lib/libglog.a ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libgflags.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/deps/lib/libcityhash.a ./ps-lite/deps/lib/liblz4.a -lpthread
+INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc -I./src/sparsehash_cpu -I/home/worker/xiaoshu/hadoop/hadoop-2.7.1/include/
+#INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc -I./src/sparsehash_cpu
 
-all: ffm_ps
+#LIBRARYPATH = -L/usr/local/lib -L./ps-lite/deps/lib/ -L./ps-lite/build/ -L./dmlc-core/
+#LIBRARY = -lglog -lprotobuf -lgflags -lzmq -lcityhash -llz4 -lps -ldmlc -lpthread
 
-ffm_ps: main.o $(LDFLAGS)
-	$(CPP) $(CPP_tag) -o $@ $^ $(INCLUDE)
+#INCLUDE = -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc -I./src/sparsehash_cpu -I/home/worker/xiaoshu/hadoop/hadoop-2.7.1/include/
+
+LIBRARY = ./ps-lite/deps/lib/libglog.a ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libgflags.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/deps/lib/libcityhash.a ./ps-lite/deps/lib/liblz4.a ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a -lpthread
+
+all: ffm_ps dump
+
+ffm_ps: main.o $(LIBRARY)
+	#$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARYPATH) $(LIBRARY)
+	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
 	rm main.o
 
-main.o: src/main.cpp
-	$(CPP) $(CPP_tag) -c src/main.cpp $(INCLUDE)
+main.o: src/main.cpp src/hdfs.h
+	$(CPP) $(CPP_tag) $(INCLUDEPATH) -c src/main.cpp
 
-#dump_model: dump.o ./repo/dmlc-core/libdmlc.a
-#	$(CPP) $(CPP_tag) -o $@ $^ $(INCLUDE)
+dump: dump.o $(LIBRARY)
+	#$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARYPATH) $(LIBRARY)
+	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
+	rm dump.o
 
-#dump.o: src/dump.cc ./repo/dmlc-core/libdmlc.a ./repo/ps-lite/deps/lib/libglog.a 
-#	$(CPP) $(CPP_tag) -c src/dump.cc $(INCLUDE)
-	
+dump.o: src/dump.cpp 
+	$(CPP) $(CPP_tag) $(INCLUDEPATH) -c src/dump.cpp
 
 clean:
 	rm -f *~ train
