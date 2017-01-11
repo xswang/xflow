@@ -42,7 +42,7 @@ class Scheduler : public ps::App{
             char now_time[1024];
             int iterator = 0;
             while(1){
-                usleep(300 * 1e6);
+                usleep(600 * 1e6);
                 snprintf(now_time, 1024, "%d-%02d-%02d %02d:%02d:%02d", t->tm_year + 1900,
                                                                         t->tm_mon + 1,
                                                                         t->tm_mday,
@@ -51,7 +51,8 @@ class Scheduler : public ps::App{
                                                                         t->tm_sec);
                 std::string timestamp;
                 timestamp = std::string(now_time);
-                if(iterator % 5 == 0)SaveModel("model", iterator);
+                //if(iterator % 5 == 0)SaveModel("model", iterator);
+                SaveModel("model", iterator);
                 iterator++;
             }
 	    }
