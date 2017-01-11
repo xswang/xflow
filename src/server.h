@@ -30,7 +30,9 @@ struct IterCmd : public DataParCmd {
 
 class Scheduler : public ps::App{
     public:
-        Scheduler(){}
+        Scheduler(){
+            
+        }
         ~Scheduler(){}
 
 	    virtual void ProcessResponse(ps::Message* response) { }
@@ -42,18 +44,19 @@ class Scheduler : public ps::App{
             char now_time[1024];
             int iterator = 0;
             while(1){
-                usleep(600 * 1e6);
-                snprintf(now_time, 1024, "%d-%02d-%02d %02d:%02d:%02d", t->tm_year + 1900,
+                usleep(6 * 1e6);
+                snprintf(now_time, 1024, "%d%02d%02d%02d%02d%02d", t->tm_year + 1900,
                                                                         t->tm_mon + 1,
-                                                                        t->tm_mday,
+                                                                        t->tm_mday - 1,
                                                                         t->tm_hour,
                                                                         t->tm_min,
                                                                         t->tm_sec);
                 std::string timestamp;
                 timestamp = std::string(now_time);
                 //if(iterator % 5 == 0)SaveModel("model", iterator);
-                SaveModel("model", iterator);
-                iterator++;
+                std::cout<<"timestamp = "<<timestamp<<std::endl;
+                SaveModel(timestamp, iterator);
+                //iterator++;
             }
 	    }
 
@@ -63,6 +66,15 @@ class Scheduler : public ps::App{
             cmd.set_iter(iter);
             ps::Task task; 
             task.set_cmd(cmd.cmd); 
+            task.set_msg(filename);
+            Submit(task, ps::kServerGroup);
+        }
+        int LoadModel(const std::string& filename, int iter) {
+            IterCmd cmd;
+            cmd.set_load_model();
+            cmd.set_iter(iter);
+            ps::Task task;
+            task.set_cmd(cmd.cmd);
             task.set_msg(filename);
             Submit(task, ps::kServerGroup);
         }
@@ -76,24 +88,24 @@ struct ISGDHandle{
         void Load(Stream* fi) { }//must has
         void Save(Stream *fo) const { }//must has
         inline void Finish(){ }//must has
-	size_t cur_iter = 0;
+	    size_t cur_iter = 0;
       private:
         int ns_ = 0;
         static int64_t new_w;
 };  
 
-template <typename T> 
-inline void TSave(Stream* fo, T* const ptr){
-    fo->Write(&ptr->w, sizeof(float));
-}
+    template <typename T> 
+        inline void TSave(Stream* fo, T* const ptr){
+        fo->Write(&ptr->w, sizeof(float));
+    }
 
-struct FTRLEntry{
-    float w = 0.0;
-    float z = 0.0;
-    float sq_cum_grad = 0.0;
-    inline void Load(Stream *fi) { }//must has
-    inline void Save(Stream *fo) const {
-	TSave(fo, this);
+    struct FTRLEntry{
+        float w = 0.0;
+        float z = 0.0;
+        float sq_cum_grad = 0.0;
+        inline void Load(Stream *fi) { }//must has
+        inline void Save(Stream *fo) const {
+	    TSave(fo, this);
     }//must has
     inline bool Empty() const { }//must has
 };
@@ -145,9 +157,13 @@ class Server : public ps::App{
             IterCmd cmd(request->task.cmd());
             auto filename = ModelName(request->task.msg(), cmd.iter());
             if(cmd.save_model()){
+                filename = "model_" + filename;
                 Stream* fo = Stream::Create(filename.c_str(), "w"); 
                 server_->Save(fo);
                 delete fo;
+                auto donefile = filename + ".done";
+                Stream* fodone = Stream::Create(donefile.c_str(), "w");
+                delete fodone;
             }else if(cmd.load_model()){
                 Stream* fi = Stream::Create(filename.c_str(), "r");
                 server_->Load(fi);
@@ -158,8 +174,9 @@ class Server : public ps::App{
     private:
         std::string ModelName(const std::string& base, int iter){
             std::string name = base;
-            if(iter >= 0) name += "_iter_" + std::to_string(iter);
-            return name + "_part_" + std::to_string(ps::NodeInfo::MyRank());
+            //if(iter >= 0) name += "_iter_" + std::to_string(iter);
+            //return name + "_part_" + std::to_string(ps::NodeInfo::MyRank());
+            return std::to_string(ps::MyKeyRange().begin()) + "_" + std::to_string(ps::MyKeyRange().end()) + '_' + name; 
         }
 };//end class Server
 
