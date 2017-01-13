@@ -1,6 +1,6 @@
-ps-lite/build/*
-ps-lite/guide/*
-ps-lite/doc/
+data/
+ps-lite/guide/
+*.a
 *.o
 *.d
 *.swp

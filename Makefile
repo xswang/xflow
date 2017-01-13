@@ -19,7 +19,7 @@ ffm_ps: main.o $(LIBRARY)
 	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
 	rm main.o
 
-main.o: src/main.cpp src/hdfs.h
+main.o: src/main.cpp 
 	$(CPP) $(CPP_tag) $(INCLUDEPATH) -c src/main.cpp
 
 dump: dump.o $(LIBRARY)
