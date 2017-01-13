@@ -117,7 +117,7 @@ int Executor::Submit(Message* msg) {
   msg->task.set_customer_id(obj_.id());
 
   // store something
-  time_ = ts+1;
+  time_ = ((ts+1) & ((1 << FLAGS_timestamp_bits) - 1)); // [gaoteng]: Round-robin reuse to deal with overflow.
   auto& req_info = sent_reqs_[ts];
   req_info.recver = msg->recver;
   if (msg->callback) {

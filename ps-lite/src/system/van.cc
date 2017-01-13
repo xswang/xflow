@@ -48,7 +48,7 @@ void Van::Init() {
         senders_[scheduler_.id()], "inproc://monitor", ZMQ_EVENT_ALL));
   }
   monitor_thread_ = new std::thread(&Van::Monitor, this);
-  monitor_thread_->detach();
+  monitor_thread_->detach();//any allocated resources will be freed
 }
 
 

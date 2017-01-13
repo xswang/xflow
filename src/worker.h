@@ -36,14 +36,18 @@ namespace dmlc{
 class Worker : public ps::App{
     public:
         Worker(const char *train_file, const char *test_file) : 
-            train_file_path(train_file), test_file_path(test_file){ 
+            train_file_path(train_file), test_file_path(test_file), isStartToRun(false){
         }
         ~Worker(){
             //delete train_data;
         } 
  
         virtual void ProcessRequest(ps::Message* request){
-            //do nothing.
+            // When scheduler notice worker: servers have finished saving model.
+            if (request->task.msg()=="StartRun")
+            {
+                isStartToRun = true;
+            }
         }
 
         float sigmoid(float x){
@@ -56,6 +60,12 @@ class Worker : public ps::App{
         }
 
 	virtual bool Run(){
+        while (!isStartToRun)
+        {
+            std::cout<<"Worker waiting for start to run"<<std::endl;
+            sleep(1);
+        }
+        std::cout<<"Worker start to run"<<std::endl;
 	    Process();
 	}
 
@@ -401,6 +411,8 @@ class Worker : public ps::App{
             std::cout<<"train end......"<<std::endl;
         }
 
+    private:
+        bool isStartToRun;
     public:
         int rank;
         int core_num;

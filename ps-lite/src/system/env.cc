@@ -20,7 +20,6 @@ void Env::Init(char* argv0) {
   if (getenv("DMLC_PS_ROOT_URI")) {
     InitDMLC();
   }
-
   InitGlog(argv0);
 }
 
@@ -48,10 +47,8 @@ void Env::InitDMLC() {
   scheduler.set_role(Node::SCHEDULER);
   scheduler.set_id("H");
   CHECK(google::protobuf::TextFormat::PrintToString(scheduler, &FLAGS_scheduler));
-
   FLAGS_num_workers = atoi(CHECK_NOTNULL(getenv("DMLC_NUM_WORKER")));
   FLAGS_num_servers = atoi(CHECK_NOTNULL(getenv("DMLC_NUM_SERVER")));
-
   AssembleMyNode();
 }
 
@@ -79,7 +76,6 @@ void Env::AssembleMyNode() {
     }
     CHECK(rank_str != NULL) << "fail to get rank size";
     my_rank = atoi(rank_str);
-
     // role and id
     CHECK_LT(my_rank, FLAGS_num_workers + FLAGS_num_servers);
     if (my_rank < FLAGS_num_workers) {
@@ -113,7 +109,5 @@ void Env::AssembleMyNode() {
 
   CHECK(google::protobuf::TextFormat::PrintToString(node, &FLAGS_my_node));
 }
-
-
 
 }  // namespace ps

@@ -1,7 +1,7 @@
 #include "ps.h"
 
 namespace ps {
-App* App::Create(int argc, char *argv[]) {
+App* App::Create(int argc, char *argv[]) {//StartSystem->Postoffice::Run->manager_.Init->app_ = App::Create(argc, argv);
   App* app = new App();
   if (ps::IsServerNode()) {
     CreateServerNode(argc, argv);

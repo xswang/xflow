@@ -4,8 +4,8 @@
 
 typedef float Val;
 
-DEFINE_int32(repeat, 1000, "repeat n times");
-DEFINE_int32(kv_pair, 1000, "number of key-value pairs a worker send to server each time.");
+DEFINE_int32(repeat, 1000000, "repeat n times");
+DEFINE_int32(kv_pair, 1000000, "number of key-value pairs a worker send to server each time.");
 DEFINE_string(mode, "online", "online or batch. (TODO)");
 
 int CreateServerNode(int argc, char *argv[]) {

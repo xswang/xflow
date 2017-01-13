@@ -9,7 +9,9 @@ class KVStoreSparse : public KVStore {
  public:
   KVStoreSparse(int id, Handle handle, int pull_val_len, int nt)
       : KVStore(id), handle_(handle), k_(pull_val_len), nt_(nt), pool_(nt) {
-    CHECK_GT(k_, 0); CHECK_GT(nt_, 0); CHECK_LT(nt_, 30);
+    CHECK_GT(k_, 0); CHECK_GT(nt_, 0); 
+    //CHECK_LT(nt_, 30);
+    CHECK_LT(nt_, 33);
     data_.resize(nt_);
     auto kr = NodeInfo::KeyRange();
     min_key_ = kr.begin();
@@ -173,7 +175,7 @@ class KVStoreSparse : public KVStore {
     for (int i = 1; i < nt_; ++i) {
       K k = min_key_ + bucket_size_ * i;
       key_pos_[i] = std::lower_bound(key + key_pos_[i-1], key + n, k) - key;
-      LOG(ERROR) << key_pos_[i] - key_pos_[i-1];
+      //LOG(ERROR) << key_pos_[i] - key_pos_[i-1];
     }
     key_pos_[nt_] = n;
   }

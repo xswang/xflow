@@ -4,6 +4,9 @@
 #include "system/van.h"
 #include "system/postoffice.h"
 #include "filter/filter.h"
+
+DECLARE_int32(timestamp_bits);
+
 namespace ps {
 
 // The presentation of a remote node used by Executor. It's not thread
@@ -12,23 +15,52 @@ namespace ps {
 // Track a request by its timestamp.
 class RequestTracker {
  public:
-  RequestTracker() { }
-  ~RequestTracker() { }
+  RequestTracker() { data_ = NULL; } // Lazy creation. To save half of memory in RemoteNode.
+  ~RequestTracker() { delete []data_; }
 
   // Returns true if timestamp "ts" is marked as finished.
   bool IsFinished(int ts) {
-    return ts < 0 || (((int)data_.size() > ts) && data_[ts]);
+    if (ts < 0)
+    {
+      return true;
+    }
+    if (NULL == data_)
+    {
+      return false;
+    }
+
+    int int_offset = 0, bit_offset = 0;
+    LocateOffsets(ts, int_offset, bit_offset);
+    return (data_[int_offset] & (((unsigned int)1) << bit_offset)) != 0;
   }
 
-  // Mark timestamp "ts" as finished.
+  // Mark timestamp "ts" as finished. Reset the future 1/4 area.
   void Finish(int ts) {
     CHECK_GE(ts, 0);
-    CHECK_LT(ts, 100000000);
-    if ((int)data_.size() <= ts) data_.resize(ts*2+5);
-    data_[ts] = true;
+    //CHECK_LT(ts, 100000000);
+    if (NULL == data_)
+    {
+      data_ = new unsigned int[1 << (FLAGS_timestamp_bits - 5)]; // 2^5==32==sizeof(unsigned int)
+      memset(data_, 0, (1 << (FLAGS_timestamp_bits - 3)));
+    }
+    int int_offset = 0, bit_offset = 0;
+    LocateOffsets(ts, int_offset, bit_offset);
+    data_[int_offset] |= (((unsigned int)1) << bit_offset);
+    {
+      int int_logic_offset = (int_offset + (1 << (FLAGS_timestamp_bits - 5 - 2))); // 5:int32; 2:2^2==4,the future 1/4 location.
+      data_[int_logic_offset & ((1 << (FLAGS_timestamp_bits - 5)) - 1)] = 0; // Reset a "32-bit-int area", to avoid missing a Finish msg.
+    }
+  }
+
+ private:
+  inline void LocateOffsets(int ts, int &int_offset, int &bit_offset)
+  {
+    CHECK_LT(ts, (1 << FLAGS_timestamp_bits));
+    int_offset = (ts >> 5); // bit_id / 32
+    bit_offset = (ts & 31); // bit_id % 32    
   }
  private:
-  std::vector<bool> data_;
+  unsigned int *data_; // NULL or bits-size==(1 << FLAGS_timestamp_bits)
 };
 
 // A remote node

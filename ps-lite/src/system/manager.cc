@@ -7,9 +7,7 @@ DECLARE_int32(num_servers);
 DECLARE_int32(num_workers);
 DECLARE_int32(num_replicas);
 DECLARE_int32(report_interval);
-
 DEFINE_int32(sync_timeout, 10, "connection timeout in sec.");
-
 DEFINE_uint64(max_key, -1, "maximal global key");
 
 Manager::Manager() {}
@@ -25,10 +23,8 @@ void Manager::Init(int argc, char *argv[]) {
   env_.Init(argv[0]);
   van_.Init();
   net_usage_.AddMyNode(van_.my_node());
-
-  app_ = App::Create(argc, argv);
+  app_ = App::Create(argc, argv);//mainly create server
   CHECK(app_ != NULL) << ": failed to create app";
-
   if (IsScheduler()) {
     if (!FLAGS_logtostderr) {
       LOG(INFO) << "Staring system. Logging into " << FLAGS_log_dir
@@ -39,7 +35,6 @@ void Manager::Init(int argc, char *argv[]) {
     } else {
       node_assigner_ = new NodeAssigner(FLAGS_num_servers, Range<Key>(0, FLAGS_max_key));
     }
-
     // add my node directly rather than sending a REGISTER_NODE request
     AddNode(van_.my_node());
   } else {
@@ -62,7 +57,6 @@ void Manager::Run() {
     // (such as yarn) is slow to start the jobs. You can increase the sync
     // timeout value, such as waiting 1000 sec:  "-sync_timeout 1000"
   }
-
   CHECK_NOTNULL(app_)->Run();
 }
 
@@ -75,12 +69,10 @@ void Manager::Stop() {
       Lock lk(nodes_mu_);
       if (active_nodes_.size() == 0) break;
     }
-
     // broadcast the terminate signal to all workers and servers
     in_exit_ = true;
     Task task = NewControlTask(Control::EXIT);
     SendTask(kCompGroup, task);
-
     // wait others are done
     if (Timeout(FLAGS_sync_timeout, [this] {
           Lock lk(nodes_mu_);
@@ -90,7 +82,6 @@ void Manager::Stop() {
                  << FLAGS_sync_timeout
                  << " sec) to wait all other nodes exited.";
     }
-
     // kill myself
     SendTask(van_.my_node(), task);
   } else {
@@ -223,13 +214,6 @@ void Manager::RemoveNode(const NodeID& node_id) {
   active_nodes_.erase(node_id);
   nodes_.erase(it);
   nodes_mu_.unlock();
-
-  // TODO use *replace* for server
-  // TODO remove from customers
-  // remove from customers
-  // for (auto& it : customers_) {
-  //   it.second.first->exec().removeNode(node);
-  // }
 
   // remove from app
   for (auto& it : customers_) {

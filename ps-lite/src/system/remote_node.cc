@@ -1,6 +1,9 @@
 #include "system/remote_node.h"
 #include "ps/shared_array.h"
 #include "ps/app.h"
+
+DEFINE_int32(timestamp_bits, 14, "timestamp range in [0, 2^timestamp_bits)");
+
 namespace ps {
 
 IFilter* RemoteNode::FindFilterOrCreate(const Filter& conf) {

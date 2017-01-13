@@ -6,6 +6,9 @@
 # compiler
 CXX = g++
 
+# whether use HDFS support during compile
+#USE_HDFS = 1
+
 # optimization flag. -O0 -ggdb for debug
 # OPT = -O3 -ggdb
 
