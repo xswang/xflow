@@ -1,0 +1,8 @@
+ps-lite/build/*
+ps-lite/guide/*
+ps-lite/doc/
+*.o
+*.d
+*.swp
+*.bk
+*.bak
