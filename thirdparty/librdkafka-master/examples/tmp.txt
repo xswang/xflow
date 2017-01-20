@@ -1,0 +1,41 @@
+gcc -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith  -I../src rdkafka_example.c -o rdkafka_example  \
+	../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt
+# rdkafka_example is ready
+#
+# Run producer (write messages on stdin)
+./rdkafka_example -P -t <topic> -p <partition>
+
+# or consumer
+./rdkafka_example -C -t <topic> -p <partition>
+
+#
+# More usage options:
+./rdkafka_example -h
+gcc -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith  -I../src rdkafka_performance.c -o rdkafka_performance  \
+	../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt
+# rdkafka_performance is ready
+#
+# Run producer
+./rdkafka_performance -P -t <topic> -p <partition> -s <msgsize>
+
+# or consumer
+./rdkafka_performance -C -t <topic> -p <partition>
+
+#
+# More usage options:
+./rdkafka_performance -h
+g++ -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith -Wno-non-virtual-dtor -I../src-cpp rdkafka_example.cpp -o rdkafka_example_cpp  \
+	../src-cpp/librdkafka++.a ../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt -lstdc++
+gcc -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith  -I../src rdkafka_consumer_example.c -o rdkafka_consumer_example  \
+	../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt
+# rdkafka_consumer_example is ready
+#
+./rdkafka_consumer_example <topic[:part]> <topic2[:part]> ..
+
+#
+# More usage options:
+./rdkafka_consumer_example -h
+g++ -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith -Wno-non-virtual-dtor -I../src-cpp rdkafka_consumer_example.cpp -o rdkafka_consumer_example_cpp  \
+	../src-cpp/librdkafka++.a ../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt -lstdc++
+g++ -g -O2 -fPIC -Wall -Wsign-compare -Wfloat-equal -Wpointer-arith -Wno-non-virtual-dtor -I../src-cpp kafkatest_verifiable_client.cpp -o kafkatest_verifiable_client  \
+	../src-cpp/librdkafka++.a ../src/librdkafka.a -lpthread -lz   -lz -lcrypto   -lcrypto -lssl -lcrypto   -lssl -lrt -lstdc++
