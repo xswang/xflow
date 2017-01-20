@@ -1,35 +1,48 @@
 1. Introduction
 
-Distributed LR With Parameter Server
+	Distributed LR With Parameter Server
 
 2. Install
 
-step 1. in the fold of logistic-regression-ftrl-ps 
+	step 1. in the fold of logistic-regression-ftrl-ps 
 
-    cd ps-lite
+	    cd ps-lite
 
-    cp third_party/* .
+	    cp third_party/* .
 
-    make
+	    make
 
-step 2.
+	step 2.
 
-    cd dmlc-core
+	    cd dmlc-core
 
-    make
+	    make
 
-step 3.
+	step 3.
 
-    cd logistic-regression-ftrl-ps
+	    cd Field-aware-Factorization-Machine-ps
 
-    make
+	    make clean && make
     
+3. todo:
+	
+	1. FM model
+	
+	2. FFM model
 
-3. Contact:
+	3. Learning hyper parameters of normazation automatically
 
-    2012wxs@gmail.com
+	4. opt algo for more sparse model
 
-4. References:
 
-[1] Ad Click Prediction: a View from the Trenches:http://dl.acm.org/citation.cfm?id=2488200
+4. Contact:
+
+	
+	2012wxs@gmail.com
+
+
+5. References:
+
+
+	[1] Ad Click Prediction: a View from the Trenches:http://dl.acm.org/citation.cfm?id=2488200
 
