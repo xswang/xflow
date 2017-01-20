@@ -1,0 +1,33 @@
+syntax = "proto2";
+package yidian.data.rawlog;
+
+message FeatureKV{
+    optional string k = 1;  //feature key
+    optional double v = 2;  //feature value
+}
+
+message BaseFeature {
+    optional string name   = 1;      //key
+    repeated FeatureKV values = 2;  //values
+}
+
+message DocFeature {
+  optional string doc_id = 1;  // doc id
+  repeated int32 ids = 3; // feature
+  optional double score = 4; //doc score
+  optional int32 times = 5; // replay times
+  //optional int32 iy = 5;   // deprecated. default = 0, click = 1, skip = -1
+  optional double gbdtscore = 6; //doc gbdt score
+  optional double y = 7; // double y, more accurate
+  repeated BaseFeature features = 8; //features;
+}
+
+message DumpFeature {
+  optional string user_id = 1;     // user id
+  repeated DocFeature docs = 2; // doc feature
+  optional int64 timestamp = 3;    // timestamp
+  optional string version = 4;     // version
+  optional string buckets = 5;  //user buckets
+  //map<string,string> contexts = 6; //contexts
+  optional string predicate_id = 7; // predicate id.
+}
