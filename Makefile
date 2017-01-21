@@ -29,6 +29,8 @@ dump: dump.o $(LIBRARY)
 dump.o: src/dump.cpp 
 	$(CPP) $(CPP_tag) $(INCLUDEPATH) -c src/dump.cpp
 
+
+
 clean:
 	rm -f *~ train
 	rm -f *.o
