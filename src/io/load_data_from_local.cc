@@ -1,4 +1,4 @@
-#include "load_data.h"
+#include "load_data_from_local.h"
 
 namespace dml{
 void LoadData::load_all_data(){

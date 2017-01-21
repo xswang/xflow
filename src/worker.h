@@ -140,7 +140,6 @@ class Worker : public ps::App{
       }
       for(int i = 0; i < wx.size(); ++i){
         float pctr = sigmoid(wx[i]);
-        //std::cout<<"wx[i] = "<<wx[i]<<" sigmoid = "<<pctr<<std::endl;
         auc_key ak;
         ak.label = test_data->label[start++];
         ak.pctr = pctr;
@@ -366,19 +365,16 @@ class Worker : public ps::App{
     }
 
     void batch_learning_threadpool(int core_num){
-      train_data_kafka = new dml::LoadData_from_kafka();
-      std::cout<<"start load kafka data"<<std::endl;
-      train_data_kafka->load_data_from_kafka();
-      std::cout<<"load kafka data end"<<std::endl;
-      return;
       ThreadPool pool(core_num);
-      /*std::cout<<"Worker predict from begining..."<<std::endl;
+      /*
+      std::cout<<"Worker predict from begining..."<<std::endl;
         if (rank == 0) predict(pool, rank, 299);
         std::cout<<"Worker Endless loop"<<std::endl;
         while (true)
         {
         sleep(1);
-        }*/
+        }
+      */
       timespec allstart, allend, allelapsed;
       for(int epoch = 0; epoch < epochs; ++epoch){
         train_data = new dml::LoadData(train_data_path, block_size<<20);
@@ -422,6 +418,7 @@ class Worker : public ps::App{
     int call_back = 1;
     int block_size = 2;
     int epochs = 10000;
+    bool data_from_kafka = true;
 
     std::atomic_llong num_batch_fly = {0};
     std::atomic_llong all_time = {0};
