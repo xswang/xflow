@@ -2,14 +2,16 @@
 
 namespace dml{
 void LoadData::load_all_data(){
-    fea_matrix.clear();
+    kv keyval;
+    std::vector<kv> sample;
+    m_data.fea_matrix.clear();
     while(!fin_.eof()){
         std::getline(fin_, line);
         sample.clear();
         const char *pline = line.c_str();
         if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
             pline += nchar;
-            label.push_back(y);
+            m_data.label.push_back(y);
             while(sscanf(pline, "%d:%ld:%d%n", &fgid, &fid, &val, &nchar) >= 3){
                 pline += nchar;
                 keyval.fgid = fgid;
@@ -18,13 +20,15 @@ void LoadData::load_all_data(){
                 sample.push_back(keyval);
             }
         }
-        fea_matrix.push_back(sample);
+        m_data.fea_matrix.push_back(sample);
     }
-    std::cout<<"size : "<<fea_matrix.size()<<std::endl;
+    std::cout<<"size : "<<m_data.fea_matrix.size()<<std::endl;
 }
 
 void LoadData::load_minibatch_data(int num){
-    fea_matrix.clear();
+    kv keyval;
+    std::vector<kv> sample;
+    m_data.fea_matrix.clear();
     for(int i = 0; i < num; ++i){
         std::getline(fin_, line);
         if(fin_.eof()) break;
@@ -32,7 +36,7 @@ void LoadData::load_minibatch_data(int num){
         const char *pline = line.c_str();
         if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
             pline += nchar;
-            label.push_back(y);
+            m_data.label.push_back(y);
             while(sscanf(pline, "%d:%ld:%d%n", &fgid, &fid, &val, &nchar) >= 3){
                 pline += nchar;
                 keyval.fgid = fgid;
@@ -41,32 +45,36 @@ void LoadData::load_minibatch_data(int num){
                 sample.push_back(keyval);
             }
         }
-        fea_matrix.push_back(sample);
+        m_data.fea_matrix.push_back(sample);
     }
 }
 
 void LoadData::load_all_hash_data(){
-    fea_matrix.clear();
+    kv keyval;
+    std::vector<kv> sample;
+    m_data.fea_matrix.clear();
     while(!fin_.eof()){
         std::getline(fin_, line);
         sample.clear();
         const char *pline = line.c_str();
         if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
             pline += nchar;
-            label.push_back(y);
+            m_data.label.push_back(y);
             while(sscanf(pline, "%s", fid_str) >= 1){
                 pline += nchar;
                 keyval.fid = h(fid_str);
                 sample.push_back(keyval);
             }
         }
-        fea_matrix.push_back(sample);
+        m_data.fea_matrix.push_back(sample);
     }
-    std::cout<<"size : "<<fea_matrix.size()<<std::endl;
+    std::cout<<"size : "<<m_data.fea_matrix.size()<<std::endl;
 }
 
 void LoadData::load_mibibatch_hash_data(int num){
-    fea_matrix.clear();
+    kv keyval;
+    std::vector<kv> sample;
+    m_data.fea_matrix.clear();
     for(int i = 0; i < num; ++i){
         std::getline(fin_, line);
         if(fin_.eof()) break;
@@ -74,20 +82,22 @@ void LoadData::load_mibibatch_hash_data(int num){
         const char *pline = line.c_str();
         if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
    	    pline += nchar;
-            label.push_back(y);
+            m_data.label.push_back(y);
 	    while(sscanf(pline, "%s", fid_str) >= 1){
       		pline += nchar;
                 keyval.fid = h(fid_str);
                 sample.push_back(keyval);
             }
         }
-        fea_matrix.push_back(sample);
+        m_data.fea_matrix.push_back(sample);
     }
 }
 
 void LoadData::load_minibatch_hash_data_fread(){
-    label.clear();
-    fea_matrix.clear();
+    kv keyval;
+    std::vector<kv> sample;
+    m_data.label.clear();
+    m_data.fea_matrix.clear();
     if(bmax < btop){
 	memmove(&buf[0], &buf[bmax], (btop - bmax) * sizeof(char));
 	//char *p = &buf[0];
@@ -122,7 +132,7 @@ void LoadData::load_minibatch_hash_data_fread(){
         float y_tmp = std::atof(p);
 	if(y_tmp > 0.0000001) y = 1;
 	else y = 0;
-        label.push_back(y);
+        m_data.label.push_back(y);
         //if(y != 0)std::cout<<"y="<<y<<std::endl;
         ++q;
         p = q;
@@ -153,7 +163,7 @@ void LoadData::load_minibatch_hash_data_fread(){
 	    p = q; 
         }//end while(*q != '\n')
         //std::cout<<"================================"<<std::endl;
-        fea_matrix.push_back(sample);
+        m_data.fea_matrix.push_back(sample);
         //break;
     }//end while(*p != '\0')
     //std::cout<<"------------------------------"<<std::endl;

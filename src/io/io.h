@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <functional>
+#include <vector>
 
 namespace dml{
 
@@ -36,7 +37,6 @@ class IO{
         std::ifstream fin_;
         FILE *fp_;
         std::string line;
-        typedef kv key_val;
         const char *file_path;
 
         int fgid;
@@ -50,4 +50,12 @@ class IO{
         int nchar;
         float y;
 };
+
+class Data
+{
+public:
+    std::vector<std::vector<kv>> fea_matrix;
+    std::vector<int> label;
+};
+
 }

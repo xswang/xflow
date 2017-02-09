@@ -20,14 +20,20 @@
 #include <set>
 #include "rdkafkacpp.h"
 #include "service_dump_feature.pb.h"
+#include "io.h"
+
+#define KAFKA_BROKERS "10.120.14.11:9092,10.120.14.12:9092"
+#define KAFKA_TOPIC   "indata_bi_dump_feature_nu"
 
 namespace dml{
 
+// Kafka statistics.
 static int eof_cnt = 0;
 static int partition_cnt = 0;
 static long msg_cnt = 0;
 static int64_t msg_bytes = 0;
 
+bool g_isRestartKafka = false;
 
 /**
  * @brief format a string timestamp from the current time
@@ -40,10 +46,12 @@ static void print_time ()
   strftime(buf, sizeof(buf) - 1, "%Y-%m-%d %H:%M:%S", localtime(&tv.tv_sec));
   fprintf(stderr, "%s.%03d: ", buf, (int)(tv.tv_usec / 1000));
 }
+
 class ExampleEventCb : public RdKafka::EventCb {
  public:
   void event_cb (RdKafka::Event &event) {
 
+    std::cerr<<std::endl;
     print_time();
 
     switch (event.type())
@@ -51,6 +59,7 @@ class ExampleEventCb : public RdKafka::EventCb {
       case RdKafka::Event::EVENT_ERROR:
         std::cerr << "ERROR (" << RdKafka::err2str(event.err()) << "): " <<
             event.str() << std::endl;
+        g_isRestartKafka = true;
         if (event.err() == RdKafka::ERR__ALL_BROKERS_DOWN)
           std::cerr << "ERROR: RdKafka::ERR__ALL_BROKERS_DOWN" << std::endl;
           exit(1);
@@ -105,9 +114,10 @@ public:
       std::cout << "ERR__ASSIGN_PARTITIONS" << std::endl;
       for (int i = 0; i < partitions.size(); ++i)
       {
-        std::cout << "ERR__ASSIGN_PARTITIONS " << i << std::endl;
-        partitions[i]->set_offset(RdKafka::Topic::OFFSET_STORED); // TODO: Use this in online.
-        //partitions[i]->set_offset(RdKafka::Topic::OFFSET_BEGINNING); // Use this in offline.
+        std::cout << "ERR__ASSIGN_PARTITIONS " << i << " OFFSET_BEGINNING" << std::endl;
+        partitions[i]->set_offset(RdKafka::Topic::OFFSET_BEGINNING); // Use this in offline.
+        //partitions[i]->set_offset(RdKafka::Topic::OFFSET_STORED); // TODO: Use this in online.
+        //partitions[i]->set_offset(RdKafka::Topic::OFFSET_END); // Just for test.
       }
       consumer->assign(partitions);
       partition_cnt = (int)partitions.size();
@@ -133,7 +143,7 @@ class LoadData_from_kafka
 public:
   LoadData_from_kafka()
   {
-    StartKafka("10.120.14.11:9092,10.120.14.12:9092", "indata_bi_dump_feature_nu");
+    StartKafka(KAFKA_BROKERS, KAFKA_TOPIC);
   }
 
   void StartKafka(const std::string &brokers, const std::string &topic)
@@ -154,6 +164,7 @@ public:
     conf->set("metadata.broker.list", brokers, errstr);
     conf->set("event_cb", &ex_event_cb, errstr);
     conf->set("default_topic_conf", tconf, errstr);
+    conf->set("log.connection.close", "false", errstr);
     delete tconf;
 
     consumer = RdKafka::KafkaConsumer::create(conf, errstr);
@@ -176,6 +187,14 @@ public:
 
   void ConsumeMsg(RdKafka::Message* &message, bool &isValid, bool &isRun) 
   {
+    if (g_isRestartKafka)
+    {
+      std::cout << "Stop Kafka" << std::endl;
+      StopKafka();
+      std::cout << "Restart Kafka" << std::endl;
+      StartKafka(KAFKA_BROKERS, KAFKA_TOPIC);
+      g_isRestartKafka = false;
+    }
     message = consumer->consume(1000);
     switch (message->err()) 
     {
@@ -188,18 +207,21 @@ public:
         /* Real message */
         msg_cnt++;
         msg_bytes += message->len();
-        std::cout << "Read msg in partition" << message->partition() << " at offset " << message->offset() << std::endl;
+        //std::cout << "Read msg in partition" << message->partition() << " at offset " << message->offset() << std::endl;
         isValid = true;
         isRun = true;
         break;
 
       case RdKafka::ERR__PARTITION_EOF:
         /* Last message */
+        /*
         if (++eof_cnt == partition_cnt) 
         {
           std::cerr << "%% EOF reached for all " << partition_cnt <<
               " partition(s)" << std::endl;
         }
+        */
+        std::cout << "ERR__PARTITION_EOF" << std::endl;
         isValid = false;
         isRun = true;
         break;
@@ -229,10 +251,13 @@ public:
   }
 
   void load_data_from_kafka()
-  {
-    fea_matrix.clear();
+  { 
+    kv keyval;
+    m_data.fea_matrix.clear();    
+    m_data.label.clear();
+    std::vector<kv> sample;
+int label1 = 0;    
     while(true){
-      sample.clear();
       RdKafka::Message* msg = NULL;
       bool isValid = false;
       bool isRun = false;
@@ -243,33 +268,44 @@ public:
       if (isValid){
         yidian::data::rawlog::DumpFeature dumpFeature;
         dumpFeature.ParseFromArray(msg->payload(), (int) msg->len());
-        std::cout << dumpFeature.user_id() << std::endl;
+        //std::cout << dumpFeature.user_id() << std::endl;
         for(yidian::data::rawlog::DocFeature docFeature : dumpFeature.docs()){
-          std::cout << docFeature.y() << std::endl;
-          label.push_back(docFeature.y());
-          for(int fid : docFeature.ids()){
-            std::cout << fid << " ";
-            //sample.push_back(h(fid));
+          //std::cout << docFeature.y() << std::endl;
+          int lb = 0;
+          if (docFeature.y() > 0)
+          {
+            lb = 1;
+            ++label1;
           }
-          std::cout << std::endl;
+          m_data.label.push_back(lb);
+          sample.clear();
+          for(int fid : docFeature.ids()){ // TODO: Is it "int"???
+            //std::cout << fid << " ";
+            keyval.fid = h(fid);
+            sample.push_back(keyval);
+          }
+          //std::cout << std::endl;
+          m_data.fea_matrix.push_back(sample);
         }
+            static int batch_id = 0;
+            if (m_data.fea_matrix.size() >= 10000 * 10)
+            {
+              ++batch_id;
+              std::cout << "Batch_id = " << batch_id << std::endl;
+              break;
+            }
       }
       delete msg;
-      fea_matrix.push_back(sample);
-    }    
+    }
+    std::cout << "Label1 = " << label1 << "; Total = " << m_data.fea_matrix.size() << std::endl;
+    std::cout << "load_data_from_kafka finished" << std::endl;       
   }
 
-  struct kv{
-    int fgid;
-    size_t fid;
-    int val;
-  };
-  std::set<long int> feaIdx;
-  std::set<long int>::iterator setIter;
-  std::vector<kv> sample;
-  std::vector<std::vector<kv>> fea_matrix;
-  std::vector<int> label;
-  std::vector<char> buf;     
+private:
+  std::hash<int> h;
+
+public:
+    Data m_data; 
 };//end LoadData_from_kafka class;
 
 }//end namespace dml

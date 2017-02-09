@@ -5,6 +5,7 @@
 #include <string.h>
 
 namespace dml{
+
 class LoadData : public IO{
     public:
         LoadData(const char *file_path, size_t block_size) : IO(file_path), buf(block_size){}
@@ -15,14 +16,10 @@ class LoadData : public IO{
         void load_minibatch_data(int num);
         void load_mibibatch_hash_data(int num);
 	    void load_minibatch_hash_data_fread();
+    private:
+        std::vector<char> buf;
     public:
-        std::set<long int> feaIdx;
-        std::set<long int>::iterator setIter;
-
-        key_val keyval;
-        std::vector<key_val> sample;
-        std::vector<std::vector<key_val>> fea_matrix;
-        std::vector<int> label;
-   	    std::vector<char> buf;
+        Data m_data;
 };
+
 }

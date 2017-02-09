@@ -23,8 +23,6 @@
 #include <sys/types.h>  
 #include <sys/socket.h>  
 
-#define IP_SIZE     16
-
 namespace dmlc{
 class Worker : public ps::App{
   public:
@@ -145,7 +143,7 @@ class Worker : public ps::App{
         ak.pctr = pctr;
         mutex.lock();
         test_auc_vec.push_back(ak);
-        md<<pctr<<"\t"<<1 - ak.label<<"\t"<<ak.label<<std::endl;
+        md<<pctr<<"\t"<<ak.label<<std::endl;
 		mutex.unlock();
       }
 	  --calculate_pctr_thread_finish_num;
@@ -159,11 +157,12 @@ class Worker : public ps::App{
       if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
 
       snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-      test_data = new dml::LoadData(test_data_path, ((size_t)4)<<30);
+      dml::LoadData test_data_loader(test_data_path, ((size_t)4)<<30);
+      test_data = &(test_data_loader.m_data);
       std::cout<<"alloc 4GB memory sucess!"<<std::endl;
       test_auc_vec.clear();
       while(true){
-		test_data->load_minibatch_hash_data_fread();
+        test_data_loader.load_minibatch_hash_data_fread();
         std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
         if(test_data->fea_matrix.size() <= 0) break;
         int thread_size = test_data->fea_matrix.size() / core_num;
@@ -177,11 +176,44 @@ class Worker : public ps::App{
         std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
       }//end while
       md.close();
-      delete test_data;
+      test_data = NULL;
       std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
       std::cout<<"block="<<block<<" ";
       calculate_auc(test_auc_vec);
     }//end predict 
+
+
+  void predict_kafka(ThreadPool &pool, int rank){
+      char buffer[1024];
+      static int predict_id = 0;
+      ++predict_id;
+      sprintf(buffer, "%d_%d", rank, predict_id);
+      std::string filename = buffer;
+      md.open("pred_" + filename + ".txt");
+      if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
+      std::cout << "predict file open: " << filename << std::endl;
+
+      test_data = train_data; // For kafka, just use train data as test data.
+      test_auc_vec.clear();
+      {
+        std::cout<<"predict_kafka: test_data size = "<<test_data->fea_matrix.size()<<std::endl;
+        if(test_data->fea_matrix.size() <= 0) return;
+        int thread_size = test_data->fea_matrix.size() / core_num;
+        calculate_pctr_thread_finish_num = core_num;
+        for(int i = 0; i < core_num; ++i){
+          int start = i * thread_size;
+          int end = (i + 1)* thread_size;
+          pool.enqueue(std::bind(&Worker::calculate_pctr, this, start, end));
+        }//end all batch
+        while(calculate_pctr_thread_finish_num > 0) usleep(10);
+        std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
+      }
+      std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
+      calculate_auc(test_auc_vec);
+
+      md.close();
+    }//end predict 
+
 
     void zpush_callback(std::vector<sample_key> all_keys, std::shared_ptr<std::vector<ps::Key>> unique_keys, std::shared_ptr<std::vector<float>> w, int start, int end){
       auto wx = std::vector<float>(end - start + 1);
@@ -253,9 +285,10 @@ class Worker : public ps::App{
       kv_.ZPull(unique_keys, &(*w), pull_callback);
     }//calculate_batch_gradient_callback
 
-    void batch_learning_callback(int core_num){
-      train_data = new dml::LoadData(train_data_path, 1);
-      train_data->load_all_data();
+    void batch_learning_callback(){
+      dml::LoadData train_data_loader(train_data_path, 1);
+      train_data = &(train_data_loader.m_data);
+      train_data_loader.load_all_data();
       ThreadPool pool(core_num);
 
       batch_num = train_data->fea_matrix.size() / block_size;
@@ -281,6 +314,7 @@ class Worker : public ps::App{
         std::cout<<"rank "<<rank<<" per process : "<<train_data->fea_matrix.size() * 1e9 * 1.0 / (allelapsed.tv_sec * 1e9 + allelapsed.tv_nsec)<<std::endl;
         std::cout<<"rank "<<rank<<" send_key_number avage: "<<send_key_numbers * 1.0 / (batch_num * core_num)<<std::endl;
       }//end all epoch
+      train_data = NULL;
     }//end batch_learning_callback
 
     void calculate_batch_gradient_threadpool(int start, int end){
@@ -364,48 +398,72 @@ class Worker : public ps::App{
       --calculate_batch_gradient_thread_finish_num;
     }
 
-    void batch_learning_threadpool(int core_num){
+    void batch_learning_threadpool(){ // Load data from local disk file. For offline benchmark test.
       ThreadPool pool(core_num);
-      /*
-      std::cout<<"Worker predict from begining..."<<std::endl;
-        if (rank == 0) predict(pool, rank, 299);
-        std::cout<<"Worker Endless loop"<<std::endl;
-        while (true)
-        {
-        sleep(1);
-        }
-      */
       timespec allstart, allend, allelapsed;
+      int train_count = 0;
       for(int epoch = 0; epoch < epochs; ++epoch){
-        train_data = new dml::LoadData(train_data_path, block_size<<20);
+        dml::LoadData train_data_loader(train_data_path, block_size<<20);
+        train_data = &(train_data_loader.m_data);
         int block = 0;
         while(1){
-          train_data->load_minibatch_hash_data_fread();
-          if(train_data->fea_matrix.size() <= 0) break;
-          int thread_size = train_data->fea_matrix.size() / core_num;
+          train_data_loader.load_minibatch_hash_data_fread(); // Load a minibatch data to buffer.
+          if(train_data->fea_matrix.size() <= 0) break; // No data read, then stop.
+          int thread_size = train_data->fea_matrix.size() / core_num; // Partition the minibatch to multi-threads.
           calculate_batch_gradient_thread_finish_num = core_num;
           for(int i = 0; i < core_num; ++i){
             int start = i * thread_size;
             int end = (i + 1)* thread_size;
             pool.enqueue(std::bind(&Worker::calculate_batch_gradient_threadpool, this, start, end));
           }//end all batch
-          while(calculate_batch_gradient_thread_finish_num > 0){
+          while(calculate_batch_gradient_thread_finish_num > 0){ // Wait for all training threads to finish.
             usleep(10);
           }
-          if((rank == 0) && ((block + 1) % 300 == 0)) predict(pool, rank, block);
+          train_count += train_data->fea_matrix.size();
+          if((rank == 0) && ((block + 1) % 300 == 0)) 
+          {
+            std::cout << "Trainied count = " << train_count << std::endl;
+            train_count = 0;
+            predict(pool, rank, block);
+          }
           ++block;
-        }//end while one epoch
-        delete train_data;
-      }//end for all epoch
+        }//end mini-batch
+        train_data = NULL;
+      }//end epoch
     }//end batch_learning_threadpool
 
-    virtual void Process(){
+    void online_learning_threadpool(){ // Load data from kafka. Never stop.
+       ThreadPool pool(core_num);
+
+       dml::LoadData_from_kafka train_data_kafka;
+       train_data = &(train_data_kafka.m_data);
+       while(1){
+         train_data_kafka.load_data_from_kafka();
+         int thread_size = train_data->fea_matrix.size() / core_num;
+         calculate_batch_gradient_thread_finish_num = core_num;
+         for(int i = 0; i < core_num; ++i){
+           int start = i * thread_size;
+           int end = (i + 1)* thread_size;
+std::cout << "Start thread (" << start << ", " << end << ")" << std::endl;
+           pool.enqueue(std::bind(&Worker::calculate_batch_gradient_threadpool, this, start, end));
+         }//end all batch
+         while(calculate_batch_gradient_thread_finish_num > 0){
+           usleep(10);
+         }
+std::cout << "All threads finished" << std::endl;
+         predict_kafka(pool, rank);
+       }//end while
+       train_data = NULL;
+    }
+
+    virtual void Process(){ // Start entry.
       rank = ps::MyRank();
       snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
       core_num = std::thread::hardware_concurrency();
       std::cout<<"core_num = "<<core_num<<std::endl;
-      batch_learning_threadpool(core_num);
-      //batch_learning_callback(core_num);
+      //batch_learning_threadpool();
+      online_learning_threadpool();
+      //batch_learning_callback();
       std::cout<<"train end......"<<std::endl;
     }
 
@@ -415,10 +473,8 @@ class Worker : public ps::App{
     int rank;
     int core_num;
     int batch_num;
-    int call_back = 1;
     int block_size = 2;
     int epochs = 10000;
-    bool data_from_kafka = true;
 
     std::atomic_llong num_batch_fly = {0};
     std::atomic_llong all_time = {0};
@@ -435,9 +491,8 @@ class Worker : public ps::App{
 
     std::ofstream md;
     std::mutex mutex;
-    dml::LoadData *train_data;
-    dml::LoadData *test_data;
-    dml::LoadData_from_kafka *train_data_kafka;
+    dml::Data *train_data;
+    dml::Data *test_data;
     const char *train_file_path;
     const char *test_file_path;
     char train_data_path[1024];
