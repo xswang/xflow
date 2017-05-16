@@ -90,7 +90,8 @@ class Worker : public ps::App{
       float area = 0.0; 
 	  int tp_n = 0;
       for(size_t i = 0; i < auc_vec.size(); ++i){
-	    if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<" auc_pctr = "<<auc_vec[i].pctr<<std::endl;
+	    if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<std::endl;
+	    //if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<" auc_pctr = "<<auc_vec[i].pctr<<std::endl;
         if(auc_vec[i].label == 1) tp_n += 1;
         else area += tp_n;
       }
@@ -403,7 +404,7 @@ class Worker : public ps::App{
       timespec allstart, allend, allelapsed;
       int train_count = 0;
       for(int epoch = 0; epoch < epochs; ++epoch){
-        dml::LoadData train_data_loader(train_data_path, block_size<<15);
+        dml::LoadData train_data_loader(train_data_path, block_size<<20);
         train_data = &(train_data_loader.m_data);
         int block = 0;
         while(1){
