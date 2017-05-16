@@ -403,7 +403,7 @@ class Worker : public ps::App{
       timespec allstart, allend, allelapsed;
       int train_count = 0;
       for(int epoch = 0; epoch < epochs; ++epoch){
-        dml::LoadData train_data_loader(train_data_path, block_size<<20);
+        dml::LoadData train_data_loader(train_data_path, block_size<<15);
         train_data = &(train_data_loader.m_data);
         int block = 0;
         while(1){
@@ -420,7 +420,7 @@ class Worker : public ps::App{
             usleep(10);
           }
           train_count += train_data->fea_matrix.size();
-          if((rank == 0) && ((block + 1) % 300 == 0)) 
+          if((rank == 0) && ((block + 1) % 3 == 0)) 
           {
             std::cout << "Trainied count = " << train_count << std::endl;
             train_count = 0;
@@ -476,7 +476,7 @@ std::cout << "All threads finished" << std::endl;
     int core_num;
     int batch_num;
     int block_size = 2;
-    int epochs = 10000;
+    int epochs = 100;
 
     std::atomic_llong num_batch_fly = {0};
     std::atomic_llong all_time = {0};

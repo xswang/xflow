@@ -82,7 +82,7 @@ class Scheduler : public ps::App{
     virtual void ProcessResponse(ps::Message* response) { }
     virtual bool Run(){
       std::cout<<"Connected "<<ps::NodeInfo::NumServers()<<" servers and "<<ps::NodeInfo::NumWorkers()<<" workers"<<std::endl;
-      LoadModel(HADOOP_MODEL_PATH);
+      //LoadModel(HADOOP_MODEL_PATH);
       ps::Task task;
       task.set_msg("StartRun");
       Submit(task, ps::kWorkerGroup);
@@ -114,86 +114,6 @@ class Scheduler : public ps::App{
       task.set_cmd(cmd.cmd); 
       task.set_msg(filename);
       Submit(task, ps::kServerGroup);
-    }
-
-    int LoadModel(const std::string& hdfs_path) {
-      std::cout<<"Scheduler fetching model file list from Hadoop."<<std::endl;
-      std::string ls_cmd = std::string("hadoop fs -ls ") + hdfs_path + std::string("/*.dat > tmp_scheduler.txt");
-      system(ls_cmd.c_str());
-      std::vector<std::string> files;
-      SaveLoadTools::GetFilesInHadoop("tmp_scheduler.txt", files);
-      std::string model_timestamp_to_load = GetLatestValidModel(files);
-      if (model_timestamp_to_load == ""){
-        std::cout<<"Scheduler: No valid model to load!"<<std::endl;
-      }
-      else{
-        std::cout<<"Scheduler: Model to load: "<<model_timestamp_to_load<<std::endl;
-        IterCmd cmd;
-        cmd.set_load_model();
-        ps::Task task; 
-        task.set_cmd(cmd.cmd); 
-        task.set_msg(model_timestamp_to_load);
-        Wait(Submit(task, ps::kServerGroup));
-        std::cout<<"Scheduler: Model load finished by all Servers."<<std::endl;
-      }
-    }
-
-  private:
-    std::string GetLatestValidModel(const std::vector<std::string> &files){
-      std::cout<<"GetLatestValidModel start"<<std::endl;
-      std::multimap<std::string, ps::Range<uint64_t>, std::greater<std::string> > m;
-      for (int i = 0; i < files.size(); ++i){
-        std::string timestamp;
-        ps::Range<uint64_t> range;
-        SaveLoadTools::ParseModelFile(files[i], timestamp, range);
-        m.insert(std::pair<std::string, ps::Range<uint64_t> > (timestamp, range));
-      }
-      if (m.empty()){
-        return "";
-      }
-      auto iter = m.begin();
-      while (iter != m.end()){
-        std::map<uint64_t, uint64_t> ranges;
-        std::string t = iter->first;
-        ranges.insert(std::pair<uint64_t, uint64_t>(iter->second.begin(), iter->second.end()));
-        ++iter;
-        while (iter != m.end() && iter->first == t){
-          ranges.insert(std::pair<uint64_t, uint64_t>(iter->second.begin(), iter->second.end()));
-          ++iter;
-        }
-        bool isUnionALL = JudgeUnionAllRange(ranges);
-        if (isUnionALL){
-          std::cout<<"Scheduler Valid Model Hit: "<<t<<std::endl;
-          return t;
-        }
-        std::cout<<"Scheduler Invalid Model: "<<t<<std::endl;
-      }
-      return "";
-    }
-
-    bool JudgeUnionAllRange(std::map<uint64_t, uint64_t> &ranges){
-      if (ranges.empty()){
-        return false;
-      }
-      auto iter = ranges.begin();
-      if (iter->first > 0){
-        return false;
-      }
-      auto last_iter = iter;
-      ++iter;
-      while (iter != ranges.end()){
-        if (iter->first > last_iter->second){
-          return false;
-        }
-        if (iter->second > last_iter->second){
-          last_iter = iter;
-        }
-        ++iter;
-      }
-      if (last_iter->second < std::numeric_limits<uint64_t>::max()){
-        return false;
-      }
-      return true;
     }
 };//end class Scheduler
 
@@ -262,7 +182,6 @@ class Server : public ps::App{
   public:
     Server(){
       CreateServer<FTRLEntry, FTRLHandle>();
-      upload_model_thread_ = std::thread(UploadModelToHadoop, this);
     }
     ~Server(){}
 
@@ -288,56 +207,9 @@ class Server : public ps::App{
         mtx_.lock();
         models_to_upload_.push(filename);
         mtx_.unlock();
-      }else if(cmd.load_model()){
-        std::string timestamp = request->task.msg();
-        std::cout<<"Server "<<ps::MyRank()<<" loading model... "<<timestamp<<std::endl;
-        std::string ls_cmd = std::string("hadoop fs -ls ") + HADOOP_MODEL_PATH + "/model_" + timestamp + std::string("*.dat > Server_tmp.txt");
-        system(ls_cmd.c_str());
-        std::vector<std::string> files;
-        SaveLoadTools::GetFilesInHadoop("Server_tmp.txt", files);
-        for (int i = 0; i < files.size(); ++i){
-          std::string timestamp;
-          ps::Range<uint64_t> range;
-          SaveLoadTools::ParseModelFile(files[i], timestamp, range);
-          auto inter = my_range.SetIntersection(range);
-          if (!inter.empty()){
-            std::cout<<"Server "<<ps::MyRank()<<" "<<my_range.ToString()<<" Loading model file "<<files[i]<<std::endl;
-            std::string get_cmd = std::string("hadoop fs -get ") + HADOOP_MODEL_PATH + "/" + files[i] + " .";
-            system(get_cmd.c_str());
-            Stream* fi = Stream::Create(filename.c_str(), "r");
-            server_->Load(fi);
-            delete fi;
-            std::string rm_cmd = std::string("rm -f ./") + files[i];
-            system(get_cmd.c_str());                       
-          }
-        }
-        std::cout<<"Server "<<ps::MyRank()<<" load model finish."<<std::endl;
       }
     }
 
-    static void UploadModelToHadoop(Server *pServer){
-      std::cout<<"upload_model_thread_ start"<<std::endl;
-      while (true){
-        usleep(100);
-        std::string filename = "";
-
-        pServer->mtx_.lock();
-        if (!pServer->models_to_upload_.empty()){
-          filename = pServer->models_to_upload_.front();
-          pServer->models_to_upload_.pop();
-        }
-        pServer->mtx_.unlock();
-
-        if (filename != ""){
-          std::cout<<"Server "<<ps::MyRank()<<" Upload model to Hadoop start: "<<filename<<std::endl;
-          std::string upload_cmd = std::string("hadoop fs -put ") + filename + " " + HADOOP_MODEL_PATH;
-          system(upload_cmd.c_str());
-          std::string rm_local = std::string("rm ") + filename;
-          system(rm_local.c_str());
-          std::cout<<"Server "<<ps::MyRank()<<" Upload model to Hadoop finish: "<<filename<<std::endl;                    
-        }
-      }
-    }       
     ps::KVStore* server_;
     std::queue<std::string> models_to_upload_;
     std::mutex mtx_;
@@ -346,8 +218,6 @@ class Server : public ps::App{
       std::string name = base;
       return "model_" + name + '_' + std::to_string(ps::MyKeyRange().begin()) + "_" + std::to_string(ps::MyKeyRange().end()) + ".dat"; 
     }
-
-    std::thread upload_model_thread_;
 };//end class Server
 
 }//end dmlc
