@@ -25,7 +25,7 @@ class IO{
                 std::cout<<"open file "<<file_path<<" error! "<<std::endl;
                 exit(1);
             }else{
-                std::cout<<"open file "<<file_path<<" sucess! "<<std::endl;
+                //std::cout<<"open file "<<file_path<<" sucess! "<<std::endl;
             }
             fp_ = fopen(file_path, "r"); 
         }
