@@ -11,7 +11,7 @@
 #include <memory>
 #include <immintrin.h>
 
-#include "io/load_data_from_kafka.h"
+//#include "io/load_data_from_kafka.h"
 #include "io/load_data_from_local.h"
 #include "threadpool/thread_pool.h"
 #include "ps.h"
@@ -432,6 +432,7 @@ class Worker : public ps::App{
       }//end epoch
     }//end batch_learning_threadpool
 
+    /*
     void online_learning_threadpool(){ // Load data from kafka. Never stop.
        ThreadPool pool(core_num);
 
@@ -455,14 +456,15 @@ std::cout << "All threads finished" << std::endl;
        }//end while
        train_data = NULL;
     }
+    */
 
     virtual void Process(){ // Start entry.
       rank = ps::MyRank();
       snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
       core_num = std::thread::hardware_concurrency();
       std::cout<<"core_num = "<<core_num<<std::endl;
-      //batch_learning_threadpool();
-      online_learning_threadpool();
+      batch_learning_threadpool();
+      //online_learning_threadpool();
       //batch_learning_callback();
       std::cout<<"train end......"<<std::endl;
     }
