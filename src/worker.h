@@ -462,6 +462,7 @@ std::cout << "All threads finished" << std::endl;
       rank = ps::MyRank();
       snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
       core_num = std::thread::hardware_concurrency();
+      core_num = 1;
       std::cout<<"core_num = "<<core_num<<std::endl;
       batch_learning_threadpool();
       //online_learning_threadpool();

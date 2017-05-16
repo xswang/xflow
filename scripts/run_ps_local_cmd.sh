@@ -1,2 +1,1 @@
-#python dmlc_local.py -n 3 -s 1 /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/bin/ffm_ps /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/data/ffm_train /home/worker/xiaoshu/Field-aware-Factorization-Machine-ps/data/ffm_test
 python dmlc_local.py -n 3 -s 1 /home/xiaoshu/rpc/Field-aware-Factorization-Machine-ps/bin/ffm_ps /home/xiaoshu/rpc/Field-aware-Factorization-Machine-ps/data/ffm_train /home/xiaoshu/rpc/Field-aware-Factorization-Machine-ps/data/ffm_test
