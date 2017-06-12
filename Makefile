@@ -15,6 +15,7 @@ ffm_ps: main.o service_dump_feature.pb.o load_data_from_local.o $(LIBRARY)
 	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
 	rm main.o
 	rm service_dump_feature.pb.o
+	mkdir bin
 	mv ffm_ps bin
 
 main.o: src/main.cpp 
@@ -37,3 +38,4 @@ dump.o: src/dump.cpp
 clean:
 	rm -f *~ train
 	rm -f *.o
+	rm -rf bin
