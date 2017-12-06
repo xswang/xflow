@@ -38,12 +38,6 @@ class W{
     int label;
     float pctr;
   };
-  timespec time_diff(timespec start, timespec end){
-    timespec tmp;
-    tmp.tv_sec =  end.tv_sec - start.tv_sec;
-    tmp.tv_nsec = end.tv_nsec - start.tv_nsec;
-    return tmp;
-  }
   struct sample_key{
     size_t fid;
     int sid;
@@ -91,7 +85,6 @@ class W{
     std::sort(all_keys.begin(), all_keys.end(), W::sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-    //auto w = std::make_shared<std::vector<float>>();
     auto w = std::vector<float>();
     int keys_size = (unique_keys).size();
     kv_->Wait(kv_->Pull(unique_keys, &w));
@@ -153,12 +146,9 @@ class W{
   }//end predict 
 
   void calculate_batch_gradient_threadpool(int start, int end){
-    timespec all_start, all_end, all_elapsed_time;
-    clock_gettime(CLOCK_MONOTONIC, &all_start);
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
-    //auto unique_keys = std::make_shared<std::vector<ps::Key>> ();;
     int line_num = 0;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
@@ -178,12 +168,7 @@ class W{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>();
-    //auto w = std::make_shared<std::vector<float>>();
-    timespec pull_start_time, pull_end_time, pull_elapsed_time;
-    clock_gettime(CLOCK_MONOTONIC, &pull_start_time);
     kv_->Wait(kv_->Pull(unique_keys, &(w)));
-    clock_gettime(CLOCK_MONOTONIC, &pull_end_time);
-    pull_elapsed_time = time_diff(pull_start_time, pull_end_time);
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -204,7 +189,6 @@ class W{
     }
 
     auto push_gradient = std::vector<float>(keys_size);
-    //auto push_gradient = std::make_shared<std::vector<float> > (keys_size);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
       size_t gradient_fid = (unique_keys)[i];
@@ -221,24 +205,13 @@ class W{
       (push_gradient)[i] /= 1.0 * line_num;
     }
 
-    timespec push_start_time, push_end_time, push_elapsed_time;
-    clock_gettime(CLOCK_MONOTONIC, &push_start_time);
     kv_->Wait(kv_->Push(unique_keys, push_gradient));//put gradient to servers;
-    clock_gettime(CLOCK_MONOTONIC, &push_end_time);
-    push_elapsed_time = time_diff(push_start_time, push_end_time);
-    clock_gettime(CLOCK_MONOTONIC, &all_end);
-    all_elapsed_time = time_diff(all_start, all_end);
-
-    all_time += all_elapsed_time.tv_sec * 1e9 + all_elapsed_time.tv_nsec;
-    all_pull_time += pull_elapsed_time.tv_sec * 1e9 + pull_elapsed_time.tv_nsec;
-    all_push_time += push_elapsed_time.tv_sec * 1e9 + push_elapsed_time.tv_nsec;
     send_key_numbers += keys_size;
     --calculate_batch_gradient_thread_finish_num;
   }
 
   void batch_learning_threadpool(){ // Load data from local disk file. For offline benchmark test.
     ThreadPool pool(core_num);
-    timespec allstart, allend, allelapsed;
     int train_count = 0;
     for(int epoch = 0; epoch < epochs; ++epoch){
       dml::LoadData train_data_loader(train_data_path, block_size<<20);
@@ -290,27 +263,24 @@ class W{
   int epochs = 100;
 
   std::atomic_llong num_batch_fly = {0};
-    std::atomic_llong all_time = {0};
-    std::atomic_llong all_push_time = {0};
-    std::atomic_llong all_pull_time = {0};
-    std::atomic_llong send_key_numbers = {0};
-    std::atomic_llong calculate_batch_gradient_thread_finish_num = {0};
-    std::atomic_llong calculate_pctr_thread_finish_num = {0};
+  std::atomic_llong send_key_numbers = {0};
+  std::atomic_llong calculate_batch_gradient_thread_finish_num = {0};
+  std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
-    float logloss = 0.0;
-    float rmse = 0.0;
-    std::vector<auc_key> auc_vec;
-    std::vector<auc_key> test_auc_vec;
+  float logloss = 0.0;
+  float rmse = 0.0;
+  std::vector<auc_key> auc_vec;
+  std::vector<auc_key> test_auc_vec;
 
-    std::ofstream md;
-    std::mutex mutex;
-    dml::Data *train_data;
-    dml::Data *test_data;
-    const char *train_file_path;
-    const char *test_file_path;
-    char train_data_path[1024];
-    char test_data_path[1024];
-    float bias = 0.0;
-    ps::KVWorker<float>* kv_;
+  std::ofstream md;
+  std::mutex mutex;
+  dml::Data *train_data;
+  dml::Data *test_data;
+  const char *train_file_path;
+  const char *test_file_path;
+  char train_data_path[1024];
+  char test_data_path[1024];
+  float bias = 0.0;
+  ps::KVWorker<float>* kv_;
 };//end class worker
 
