@@ -1,2 +1,1 @@
-sh local.sh 1 3 /root/xiaoshu/opensource/logistic_regression_ps/bin/lr_ps /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_train /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_test
-#python dmlc_local.py -n 2 -s 1 /root/xiaoshu/opensource/logistic_regression_ps/bin/lr_ps /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_train /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_test
+sh local.sh 1 3 /root/xiaoshu/opensource/logistic_regression_ps/bin/lr_ps /root/xiaoshu/opensource/logistic_regression_ps/data/lr_train /root/xiaoshu/opensource/logistic_regression_ps/data/lr_test
