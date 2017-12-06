@@ -3,20 +3,23 @@ CPP = g++
 CPP_tag = -std=c++11 -g -O3 -msse3
 
 #INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc -I./thirdparty/librdkafka-master/src-cpp
-INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc 
+INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc  -I./ps-lite/include/ps -I./ps-lite/include -I./dmlc-core/include
 
 #LIBRARY = /usr/local/lib/librdkafka++.a /usr/local/lib/librdkafka.a ./ps-lite/deps/lib/libglog.a ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libgflags.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/deps/lib/libcityhash.a ./ps-lite/deps/lib/liblz4.a ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a -lz -lpthread -lssl -lcrypto
-LIBRARY = ./ps-lite/deps/lib/libglog.a ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libgflags.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/deps/lib/libcityhash.a ./ps-lite/deps/lib/liblz4.a ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a -lz -lpthread
+#LIBRARY = ./ps-lite/deps/lib/libglog.a ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libgflags.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/deps/lib/libcityhash.a ./ps-lite/deps/lib/liblz4.a ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a -lz -lpthread
+LIBRARY = ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/build/libps.a ./dmlc-core/libdmlc.a -lz -lpthread
 
-all: ffm_ps dump
+all: lr_ps dump
 
 
-ffm_ps: main.o service_dump_feature.pb.o load_data_from_local.o $(LIBRARY)
+lr_ps: main.o service_dump_feature.pb.o load_data_from_local.o $(LIBRARY)
 	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
 	rm main.o
 	rm service_dump_feature.pb.o
+	rm load_data_from_local.o
+	rm -rf bin
 	mkdir bin
-	mv ffm_ps bin
+	mv lr_ps bin
 
 main.o: src/main.cpp 
 	$(CPP) $(CPP_tag) $(INCLUDEPATH) -c src/main.cpp
