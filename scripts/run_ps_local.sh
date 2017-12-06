@@ -1,2 +1,1 @@
-src_path=/root/xiaoshu/opensource/logistic_regression_ps
-python dmlc_local.py -n 1 -s 1 ${src_path}/bin/lr_ps ${src_path}/data/ffm_train ${src_path}/data/ffm_test
+python dmlc_local.py -n 2 -s 1 /root/xiaoshu/opensource/logistic_regression_ps/bin/lr_ps /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_train /root/xiaoshu/opensource/logistic_regression_ps/data/ffm_test

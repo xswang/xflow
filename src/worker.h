@@ -136,12 +136,9 @@ class W{
         pool.enqueue(std::bind(&W::calculate_pctr, this, start, end));
       }//end all batch
       while(calculate_pctr_thread_finish_num > 0) usleep(10);
-      std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
     }//end while
     md.close();
     test_data = NULL;
-    std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
-    std::cout<<"block="<<block<<" ";
     calculate_auc(test_auc_vec);
   }//end predict 
 
@@ -150,6 +147,7 @@ class W{
     auto all_keys = std::vector<sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
     int line_num = 0;
+    std::cout << "start = " << start << " : " << "end = " << end << std::endl;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
       sample_key sk;
@@ -181,7 +179,7 @@ class W{
       else if(allkeys_fid > weight_fid){ 
         ++i;
       }
-    }//end for
+    }
     for(int i = 0; i < wx.size(); i++){
       pctr = sigmoid(wx[i]);
       float loss = pctr - train_data->label[start++];
@@ -206,13 +204,11 @@ class W{
     }
 
     kv_->Wait(kv_->Push(unique_keys, push_gradient));//put gradient to servers;
-    send_key_numbers += keys_size;
-    --calculate_batch_gradient_thread_finish_num;
+    --gradient_thread_finish_num;
   }
 
   void batch_learning_threadpool(){ // Load data from local disk file. For offline benchmark test.
     ThreadPool pool(core_num);
-    int train_count = 0;
     for(int epoch = 0; epoch < epochs; ++epoch){
       dml::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
@@ -221,34 +217,28 @@ class W{
         train_data_loader.load_minibatch_hash_data_fread(); // Load a minibatch data to buffer.
         if(train_data->fea_matrix.size() <= 0) break; // No data read, then stop.
         int thread_size = train_data->fea_matrix.size() / core_num; // Partition the minibatch to multi-threads.
-        calculate_batch_gradient_thread_finish_num = core_num;
+        gradient_thread_finish_num = core_num;
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
           pool.enqueue(std::bind(&W::calculate_batch_gradient_threadpool, this, start, end));
-        }//end all batch
-        while(calculate_batch_gradient_thread_finish_num > 0){ // Wait for all training threads to finish.
-          usleep(10);
         }
-        train_count += train_data->fea_matrix.size();
-        if((rank == 0) && ((block + 1) % 3 == 0)) 
-        {
-          std::cout << "Trainied count = " << train_count << std::endl;
-          train_count = 0;
-          predict(pool, rank, block);
+        while(gradient_thread_finish_num > 0){ // Wait for all training threads to finish.
+          usleep(50);
         }
         ++block;
-      }//end mini-batch
+      }
+      std::cout << "epoch : " << epoch << std::endl;
       train_data = NULL;
-    }//end epoch
-  }//end batch_learning_threadpool
+    }  // end epoch
+  }  // end batch_learning_threadpool
 
 
   void Process(){ // Start entry.
     rank = ps::MyRank();
+    std::cout << "my rank = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     core_num = std::thread::hardware_concurrency();
-    std::cout<<"core_num = "<<core_num<<std::endl;
     batch_learning_threadpool();
     std::cout<<"train end......"<<std::endl;
   }
@@ -263,8 +253,7 @@ class W{
   int epochs = 100;
 
   std::atomic_llong num_batch_fly = {0};
-  std::atomic_llong send_key_numbers = {0};
-  std::atomic_llong calculate_batch_gradient_thread_finish_num = {0};
+  std::atomic_llong gradient_thread_finish_num = {0};
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
   float logloss = 0.0;
