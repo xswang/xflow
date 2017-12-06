@@ -18,11 +18,11 @@
 
 class W{
  public:
-  W(const char *train_file, const char *test_file) :
-                                                   train_file_path(train_file),
-                                                   test_file_path(test_file),
-                                                   isStartToRun(false) {
-    kv_ = new ps::KVWorker<float>(1);
+  W(const char *train_file,
+    const char *test_file) :
+                           train_file_path(train_file),
+                           test_file_path(test_file) {
+    kv_ = new ps::KVWorker<float>(0);
   }
   ~W() {}
 
@@ -34,10 +34,6 @@ class W{
       return ex / (1.0 + ex);
     }
   }
-  struct auc_key{
-    int label;
-    float pctr;
-  };
   struct sample_key{
     size_t fid;
     int sid;
@@ -48,106 +44,11 @@ class W{
   static bool unique_finder(const sample_key& a, const sample_key& b){
     return a.fid == b.fid;
   }
-  void calculate_auc(std::vector<auc_key>& auc_vec){
-    std::sort(auc_vec.begin(), auc_vec.end(), [](const auc_key& a, const auc_key& b){
-      return a.pctr > b.pctr;
-    });
-    float area = 0.0; 
-    int tp_n = 0;
-    for(size_t i = 0; i < auc_vec.size(); ++i){
-      if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<std::endl;
-      if(auc_vec[i].label == 1) tp_n += 1;
-      else area += tp_n;
-    }
-    if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
-    else{
-      area /= 1.0 * (tp_n * (auc_vec.size() - tp_n));
-      std::cout<<"auc = "<<area<<"\ttp = "<<tp_n<<" fp = "<<(auc_vec.size() - tp_n)<<std::endl;
-    }
-  }
-
-  void calculate_pctr(int start, int end){
-    auto all_keys = std::vector<sample_key>();
-    auto unique_keys = std::vector<ps::Key>();
-    int line_num = 0;
-    for(int row = start; row < end; ++row) {
-      int sample_size = test_data->fea_matrix[row].size();
-      sample_key sk;
-      sk.sid = line_num;
-      for(int j = 0; j < sample_size; ++j) {
-        size_t idx = test_data->fea_matrix[row][j].fid;
-        sk.fid = idx;
-        all_keys.push_back(sk);
-        (unique_keys).push_back(idx);
-      }
-      ++line_num;
-    }
-    std::sort(all_keys.begin(), all_keys.end(), W::sort_finder);
-    std::sort((unique_keys).begin(), (unique_keys).end());
-    (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-    auto w = std::vector<float>();
-    int keys_size = (unique_keys).size();
-    kv_->Wait(kv_->Pull(unique_keys, &w));
-    auto wx = std::vector<float>(line_num);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = (unique_keys)[i];
-      if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += w[i];
-        ++j;
-      }
-      else if(allkeys_fid > weight_fid){
-        ++i;
-      }
-    }
-    for(int i = 0; i < wx.size(); ++i){
-      float pctr = sigmoid(wx[i]);
-      auc_key ak;
-      ak.label = test_data->label[start++];
-      ak.pctr = pctr;
-      mutex.lock();
-      test_auc_vec.push_back(ak);
-      md<<pctr<<"\t"<<ak.label<<std::endl;
-      mutex.unlock();
-    }
-    --calculate_pctr_thread_finish_num;
-  }//calculate_pctr
-
-  void predict(ThreadPool &pool, int rank, int block){
-    char buffer[1024];
-    snprintf(buffer, 1024, "%d_%d", rank, block);
-    std::string filename = buffer;
-    md.open("pred_" + filename + ".txt");
-    if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
-    snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-    dml::LoadData test_data_loader(test_data_path, ((size_t)4)<<30);
-    test_data = &(test_data_loader.m_data);
-    std::cout<<"alloc 4GB memory sucess!"<<std::endl;
-    test_auc_vec.clear();
-    while(true){
-      test_data_loader.load_minibatch_hash_data_fread();
-      std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
-      if(test_data->fea_matrix.size() <= 0) break;
-      int thread_size = test_data->fea_matrix.size() / core_num;
-      calculate_pctr_thread_finish_num = core_num;
-      for(int i = 0; i < core_num; ++i){
-        int start = i * thread_size;
-        int end = (i + 1)* thread_size;
-        pool.enqueue(std::bind(&W::calculate_pctr, this, start, end));
-      }//end all batch
-      while(calculate_pctr_thread_finish_num > 0) usleep(10);
-    }//end while
-    md.close();
-    test_data = NULL;
-    calculate_auc(test_auc_vec);
-  }//end predict 
-
   void calculate_batch_gradient_threadpool(int start, int end){
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
     int line_num = 0;
-    std::cout << "start = " << start << " : " << "end = " << end << std::endl;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
       sample_key sk;
@@ -233,18 +134,16 @@ class W{
     }  // end epoch
   }  // end batch_learning_threadpool
 
-
-  void Process(){ // Start entry.
+  void P(){ // Start entry.
     rank = ps::MyRank();
-    std::cout << "my rank = " << rank << std::endl;
+    std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     core_num = std::thread::hardware_concurrency();
+    core_num = 1;
     batch_learning_threadpool();
     std::cout<<"train end......"<<std::endl;
   }
 
- private:
-  bool isStartToRun;
  public:
   int rank;
   int core_num;
@@ -258,8 +157,6 @@ class W{
 
   float logloss = 0.0;
   float rmse = 0.0;
-  std::vector<auc_key> auc_vec;
-  std::vector<auc_key> test_auc_vec;
 
   std::ofstream md;
   std::mutex mutex;

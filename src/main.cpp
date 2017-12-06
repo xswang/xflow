@@ -4,9 +4,13 @@
 #include "ps.h"
 
 int main(int argc,char *argv[]){
-  W* worker = new W(argv[1], argv[2]);
-  S* server = new S();
+  if (ps::IsServer()) {
+    S* server = new S();
+  }
   ps::Start();
-  worker->Process();
+  if (ps::IsWorker()) {
+    W* worker = new W(argv[1], argv[2]);
+    worker->P();
+  }
   ps::Finalize();
 }

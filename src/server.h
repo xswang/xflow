@@ -2,12 +2,6 @@
 #include "ps.h"
 #include <time.h>
 
-class Scheduler{
-  public:
-    Scheduler(){}
-    ~Scheduler(){}
-};
-
 float alpha;
 float beta;
 float lambda1;
@@ -61,6 +55,7 @@ class S{
   S(){
     auto server_ = new ps::KVServer<float>(0);
     server_->set_request_handle(KVServerFTRLHandle());
+    std::cout << "init server success " << std::endl;
   }
   ~S(){}
   ps::KVServer<float>* server_;
