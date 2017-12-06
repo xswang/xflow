@@ -4,35 +4,17 @@
 
 2. Install
 
-	step 1. in the fold of logistic-regression-ftrl-ps 
+	step 1. in the fold of logistic_regression_ps
 
-	    cd ps-lite
-
-	    cp third_party/* .
-
-	    make
-
-	step 2.
-
-	    cd dmlc-core
-
-	    make
-
-	step 3.
-
-	    cd Field-aware-Factorization-Machine-ps
+	    cd logistic_regression_ps
 
 	    make clean && make
     
 3. todo:
 	
-	1. FM model
-	
-	2. FFM model
+	1. Learning hyper parameters of normazation automatically
 
-	3. Learning hyper parameters of normazation automatically
-
-	4. opt algo for more sparse model
+	2. opt algo for more sparse model
 
 
 4. Contact:
