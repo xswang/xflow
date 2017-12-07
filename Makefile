@@ -2,19 +2,19 @@
 CPP = g++
 CPP_tag = -std=c++11 -g -O3 -msse3
 
-#INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./dmlc-core/include/dmlc  -I./ps-lite/include/ps -I./ps-lite/include -I./dmlc-core/include
-INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/src -I./ps-lite/deps/include -I./ps-lite/include/ps -I./ps-lite/include
+INCLUDEPATH = -I/usr/local/include/ -I/usr/include -I./ps-lite/deps/include -I./ps-lite/include/ps -I./ps-lite/include
 
+#for OSX
 LIBRARY = ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/build/libps.a
+#for LINUX
+#LIBRARY = ./ps-lite/deps/lib/libprotobuf.a ./ps-lite/deps/lib/libzmq.a ./ps-lite/build/libps.a -lpthread
 
 all: lr_ps
 
 
 lr_ps: main.o service_dump_feature.pb.o load_data_from_local.o $(LIBRARY)
 	$(CPP) $(CPP_tag) -o $@ $^ $(LIBRARY)
-	rm main.o
-	rm service_dump_feature.pb.o
-	rm load_data_from_local.o
+	rm *.o
 	rm -rf bin
 	mkdir bin
 	mv lr_ps bin
