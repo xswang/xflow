@@ -12,9 +12,9 @@
     
 3. todo:
 	
-	1. Learning hyper parameters of normazation automatically
+	  1. Learning hyper parameters of normazation automatically
 
-	2. opt algo for more sparse model
+	  2. opt algo for more sparse model
 
 
 4. Contact:
