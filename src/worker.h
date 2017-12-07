@@ -53,7 +53,7 @@ class W{
       int sample_size = train_data->fea_matrix[row].size();
       sample_key sk;
       sk.sid = line_num;
-      for(int j = 0; j < sample_size; ++j){//for one instance
+      for(int j = 0; j < sample_size; ++j){
         idx = train_data->fea_matrix[row][j].fid;
         sk.fid = idx;
         all_keys.push_back(sk);
@@ -77,7 +77,7 @@ class W{
         wx[all_keys[j].sid] += (w)[i];
         ++j;
       }
-      else if(allkeys_fid > weight_fid){ 
+      else if(allkeys_fid > weight_fid){
         ++i;
       }
     }
@@ -104,37 +104,37 @@ class W{
       (push_gradient)[i] /= 1.0 * line_num;
     }
 
-    kv_->Wait(kv_->Push(unique_keys, push_gradient));//put gradient to servers;
+    kv_->Wait(kv_->Push(unique_keys, push_gradient));
     --gradient_thread_finish_num;
   }
 
-  void batch_learning_threadpool(){ // Load data from local disk file. For offline benchmark test.
+  void batch_learning_threadpool(){
     ThreadPool pool(core_num);
     for(int epoch = 0; epoch < epochs; ++epoch){
       dml::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
       int block = 0;
       while(1){
-        train_data_loader.load_minibatch_hash_data_fread(); // Load a minibatch data to buffer.
-        if(train_data->fea_matrix.size() <= 0) break; // No data read, then stop.
-        int thread_size = train_data->fea_matrix.size() / core_num; // Partition the minibatch to multi-threads.
+        train_data_loader.load_minibatch_hash_data_fread();
+        if(train_data->fea_matrix.size() <= 0) break;
+        int thread_size = train_data->fea_matrix.size() / core_num;
         gradient_thread_finish_num = core_num;
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
           pool.enqueue(std::bind(&W::calculate_batch_gradient_threadpool, this, start, end));
         }
-        while(gradient_thread_finish_num > 0){ // Wait for all training threads to finish.
-          usleep(50);
+        while(gradient_thread_finish_num > 0){
+          usleep(5);
         }
         ++block;
       }
       std::cout << "epoch : " << epoch << std::endl;
       train_data = NULL;
-    }  // end epoch
-  }  // end batch_learning_threadpool
+    }
+  }
 
-  void P(){ // Start entry.
+  void P(){
     rank = ps::MyRank();
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
