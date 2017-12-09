@@ -9,7 +9,7 @@ void LoadData::load_all_data(){
     std::getline(fin_, line);
     sample.clear();
     const char *pline = line.c_str();
-    if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
+    if(sscanf(pline, "%f%n", &y, &nchar) >= 1){
       pline += nchar;
       m_data.label.push_back(y);
       while(sscanf(pline, "%d:%ld:%d%n", &fgid, &fid, &val, &nchar) >= 3){
@@ -34,7 +34,7 @@ void LoadData::load_minibatch_data(int num){
     if(fin_.eof()) break;
     sample.clear();
     const char *pline = line.c_str();
-    if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
+    if(sscanf(pline, "%f%n", &y, &nchar) >= 1){
       pline += nchar;
       m_data.label.push_back(y);
       while(sscanf(pline, "%d:%ld:%d%n", &fgid, &fid, &val, &nchar) >= 3){
@@ -57,7 +57,7 @@ void LoadData::load_all_hash_data(){
     std::getline(fin_, line);
     sample.clear();
     const char *pline = line.c_str();
-    if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
+    if(sscanf(pline, "%f%n", &y, &nchar) >= 1){
       pline += nchar;
       m_data.label.push_back(y);
       while(sscanf(pline, "%s", fid_str) >= 1){
@@ -80,7 +80,7 @@ void LoadData::load_mibibatch_hash_data(int num){
     if(fin_.eof()) break;
     sample.clear();
     const char *pline = line.c_str();
-    if(sscanf(pline, "%d%n", &y, &nchar) >= 1){
+    if(sscanf(pline, "%f%n", &y, &nchar) >= 1){
       pline += nchar;
       m_data.label.push_back(y);
       while(sscanf(pline, "%s", fid_str) >= 1){

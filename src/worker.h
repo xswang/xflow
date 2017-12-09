@@ -258,7 +258,6 @@ class W{
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
   float logloss = 0.0;
-  float rmse = 0.0;
   std::vector<auc_key> auc_vec;
   std::vector<auc_key> test_auc_vec;
 
