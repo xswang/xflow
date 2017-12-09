@@ -231,7 +231,7 @@ class W{
         }
         ++block;
       }
-      predict(pool, rank, 0);
+      if (rank == 0) predict(pool, rank, 0);
       std::cout << "epoch : " << epoch << std::endl;
       train_data = NULL;
     }
