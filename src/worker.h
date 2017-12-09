@@ -57,7 +57,6 @@ class W{
     float area = 0.0; 
     int tp_n = 0;
     for(size_t i = 0; i < auc_vec.size(); ++i){
-      if(i % 500000 == 0) std::cout<<"auc_label = "<<auc_vec[i].label<<" auc_pctr = "<<auc_vec[i].pctr<<std::endl;
       if(auc_vec[i].label == 1) tp_n += 1;
       else area += tp_n;
     }
@@ -125,11 +124,9 @@ class W{
     snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
     dml::LoadData test_data_loader(test_data_path, ((size_t)4)<<16);
     test_data = &(test_data_loader.m_data);
-    std::cout<<"alloc 4GB memory sucess!"<<std::endl;
     test_auc_vec.clear();
     while(true){
       test_data_loader.load_minibatch_hash_data_fread();
-      std::cout<<"test_data size = "<<test_data->fea_matrix.size()<<std::endl;
       if(test_data->fea_matrix.size() <= 0) break;
       int thread_size = test_data->fea_matrix.size() / core_num;
       calculate_pctr_thread_finish_num = core_num;
@@ -139,12 +136,9 @@ class W{
         pool.enqueue(std::bind(&W::calculate_pctr, this, start, end));
       }//end all batch
       while(calculate_pctr_thread_finish_num > 0) usleep(10);
-      std::cout<<"test auc vec size in while = "<<test_auc_vec.size()<<std::endl;
     }//end while
     md.close();
     test_data = NULL;
-    std::cout<<"test auc vec size out while = "<<test_auc_vec.size()<<std::endl;
-    std::cout<<"block="<<block<<" ";
     calculate_auc(test_auc_vec);
   }//end predict 
 
