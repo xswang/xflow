@@ -59,7 +59,11 @@ class W{
     for(size_t i = 0; i < auc_vec.size(); ++i){
       if(auc_vec[i].label == 1) tp_n += 1;
       else area += tp_n;
+      logloss += auc_vec[i].label * std::log2(auc_vec[i].pctr) 
+                 + (1.0 - auc_vec[i].label) * std::log2(1.0 - auc_vec[i].pctr);
     }
+    logloss /= auc_vec.size();
+    std::cout << "logloss: " << logloss << "\t";
     if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
     else{
       area /= 1.0 * (tp_n * (auc_vec.size() - tp_n));
@@ -247,7 +251,7 @@ class W{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 5;
+  int epochs = 50;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
