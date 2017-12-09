@@ -68,10 +68,6 @@ class W{
 
     auto w = std::vector<float>();
     kv_->Wait(kv_->Pull(unique_keys, &(w)));
-    for (size_t i = 0; i < w.size(); ++i) {
-      std::cout <<w[i] << " ";
-    }
-    std::cout << std::endl;
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
