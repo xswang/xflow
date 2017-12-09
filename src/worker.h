@@ -68,6 +68,10 @@ class W{
 
     auto w = std::vector<float>();
     kv_->Wait(kv_->Pull(unique_keys, &(w)));
+    for (size_t i = 0; i < w.size(); ++i) {
+      std::cout <<w[i] << " ";
+    }
+    std::cout << std::endl;
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -139,7 +143,6 @@ class W{
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     core_num = std::thread::hardware_concurrency();
-    core_num = 1;
     batch_learning_threadpool();
     std::cout<<"train end......"<<std::endl;
   }
@@ -149,7 +152,7 @@ class W{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 100;
+  int epochs = 5;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
