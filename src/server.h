@@ -8,9 +8,12 @@ float lambda1;
 float lambda2;
 
 struct FTRLEntry{
-  float w = 0.0;
-  float z = 0.0;
-  float n = 0.0;
+  FTRLEntry() : w(0.0), z(0.0), n(0.0) {
+   
+  }
+  float w;
+  float z;
+  float n;
 };
 
 struct KVServerFTRLHandle {
@@ -25,23 +28,28 @@ struct KVServerFTRLHandle {
     }
     for (size_t i = 0; i < n; ++i) {
       ps::Key key = req_data.keys[i];
+      if (store.find(key) == store.end()) {
+        FTRLEntry entry;
+        store.insert({key, entry});
+      }
+      FTRLEntry val = store[key];
       if (req_meta.push) {
         float g = req_data.vals[i];
-        float old_n = store[key].n;
+        float old_n = val.n;
         float n = old_n + g * g;
-        store[key].z += g - (std::sqrt(n) - std::sqrt(old_n)) / alpha * store[key].w;
-        store[key].n = n;
-        if (std::abs(store[key].z) <= lambda1) {
-          store[key].w = 0.0;
+        val.z += g - (std::sqrt(n) - std::sqrt(old_n)) / alpha * val.w;
+        val.n = n;
+        if (std::abs(val.z) <= lambda1) {
+          val.w = 0.0;
         } else {
           float tmpr= 0.0;
-          if (store[key].z >= 0.0) tmpr = store[key].z - lambda1;
-          else tmpr = store[key].z + lambda1;
-          float tmpl = -1 * ( (beta + store[key].n)/alpha  + lambda2 );
-          store[key].w = tmpr / tmpl;
+          if (val.z >= 0.0) tmpr = val.z - lambda1;
+          else tmpr = val.z + lambda1;
+          float tmpl = -1 * ( (beta + val.n)/alpha  + lambda2 );
+          val.w = tmpr / tmpl;
         }
       } else {
-        res.vals[i] = store[key].w;
+        res.vals[i] = val.w;
       }
     }
     server->Response(req_meta, res);
