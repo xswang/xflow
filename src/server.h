@@ -2,14 +2,14 @@
 #include "ps.h"
 #include <time.h>
 
-float alpha;
-float beta;
-float lambda1;
-float lambda2;
+float alpha = 0.001;
+float beta = 1.0;
+float lambda1 = 0.00001;
+float lambda2 = 2.0;
 
 struct FTRLEntry{
   FTRLEntry() : w(0.0), z(0.0), n(0.0) {
-   
+
   }
   float w;
   float z;
@@ -32,7 +32,7 @@ struct KVServerFTRLHandle {
         FTRLEntry entry;
         store.insert({key, entry});
       }
-      FTRLEntry val = store[key];
+      FTRLEntry& val = store[key];
       if (req_meta.push) {
         float g = req_data.vals[i];
         float old_n = val.n;
@@ -43,9 +43,9 @@ struct KVServerFTRLHandle {
           val.w = 0.0;
         } else {
           float tmpr= 0.0;
-          if (val.z >= 0.0) tmpr = val.z - lambda1;
-          else tmpr = val.z + lambda1;
-          float tmpl = -1 * ( (beta + val.n)/alpha  + lambda2 );
+          if (val.z > 0.0) tmpr = val.z - lambda1;
+          if (val.z < 0.0) tmpr = val.z + lambda1;
+          float tmpl = -1 * ( (beta + std::sqrt(val.n))/alpha  + lambda2 );
           val.w = tmpr / tmpl;
         }
       } else {
