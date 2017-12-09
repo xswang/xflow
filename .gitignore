@@ -1,9 +1,12 @@
-data/
-ps-lite/guide/
+bin/
+ps-lite/deps/
+.DS_Store
+*.pb.cc
 *.a
 *.o
 *.d
 *.swp
 *.bk
 *.bak
+*.txt
 
