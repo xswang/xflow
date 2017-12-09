@@ -3,7 +3,6 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-
     hdfsFS fs = hdfsConnect("default", 0);
     const char* writePath = "/tmp/testfile.txt";
     hdfsFile writeFile = hdfsOpenFile(fs, writePath, O_WRONLY|O_CREAT, 0, 0, 0);
