@@ -2,10 +2,10 @@
 #include "ps.h"
 #include <time.h>
 
-float alpha = 0.001;
+float alpha = 5e-2;
 float beta = 1.0;
-float lambda1 = 0.00001;
-float lambda2 = 2.0;
+float lambda1 = 5e-5;
+float lambda2 = 15.0;
 
 struct FTRLEntry{
   FTRLEntry() : w(0.0), z(0.0), n(0.0) {
@@ -28,10 +28,6 @@ struct KVServerFTRLHandle {
     }
     for (size_t i = 0; i < n; ++i) {
       ps::Key key = req_data.keys[i];
-      if (store.find(key) == store.end()) {
-        FTRLEntry entry;
-        store.insert({key, entry});
-      }
       FTRLEntry& val = store[key];
       if (req_meta.push) {
         float g = req_data.vals[i];
