@@ -6,7 +6,7 @@
 int v_dim;
 
 int main(int argc,char *argv[]){
-  v_dim = 6;
+  v_dim = 1;
   if (ps::IsServer()) {
     S* server = new S();
   }
