@@ -7,12 +7,14 @@ float beta = 1.0;
 float lambda1 = 5e-5;
 float lambda2 = 15.0;
 
+extern int v_dim;
+
 typedef struct FTRLEntry{
-  FTRLEntry(int k = 10) {
+  FTRLEntry(int k = v_dim) {
     w.resize(k, 0.0);
     n.resize(k, 0.0);
     z.resize(k, 0.0);
-  }
+  };
   std::vector<float> w;
   std::vector<float> n;
   std::vector<float> z;
@@ -20,7 +22,6 @@ typedef struct FTRLEntry{
 
 struct KVServerFTRLHandle {
   void operator()(const ps::KVMeta& req_meta, const ps::KVPairs<float>& req_data, ps::KVServer<float>* server) {
-    int k = 1;
     size_t n = req_data.keys.size();
     ps::KVPairs<float> res;
     if (req_meta.push) {
@@ -34,7 +35,7 @@ struct KVServerFTRLHandle {
       FTRLEntry& val = store[key];
       for (int j = 0; j < 1; ++j){
         if (req_meta.push) {
-          float g = req_data.vals[i * k + j];
+          float g = req_data.vals[i * v_dim + j];
           float old_n = val.n[j];
           float n = old_n + g * g;
           val.z[j] += g - (std::sqrt(n) - std::sqrt(old_n)) / alpha * val.w[j];
@@ -50,7 +51,7 @@ struct KVServerFTRLHandle {
           }
         } else {
           for (int j = 0; j < 1; ++j) {
-            res.vals[i * k + j] = val.w[j];
+            res.vals[i * v_dim + j] = val.w[j];
           }
         }
       }
