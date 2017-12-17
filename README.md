@@ -3,6 +3,11 @@
 	Distributed LR With Parameter Server
 
 2. Install
+  step 0. in the fold of logistic_regression_ps
+      
+      cd ps-lite
+
+      make
 
 	step 1. in the fold of logistic_regression_ps
 
