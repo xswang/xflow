@@ -12,8 +12,6 @@
 
         step 1. in the fold of logistic_regression_ps
 
-            cd logistic_regression_ps
- 
             make clean && make
     
 3. todo:
