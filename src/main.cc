@@ -1,7 +1,7 @@
-#include "worker.h"
-#include "server.h"
+#include "src/worker.h"
+#include "src/server.h"
 
-#include "ps.h"
+#include "ps/ps.h"
 
 int v_dim;
 
