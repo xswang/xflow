@@ -1,5 +1,4 @@
 bin/
-ps-lite/deps/
 .DS_Store
 *.pb.cc
 *.a
@@ -8,5 +7,6 @@ ps-lite/deps/
 *.swp
 *.bk
 *.bak
+build/
 
 
