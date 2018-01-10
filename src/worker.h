@@ -11,9 +11,9 @@
 #include <memory>
 #include <immintrin.h>
 
-#include "io/load_data_from_local.h"
-#include "threadpool/thread_pool.h"
-#include "ps.h"
+#include "src/io/load_data_from_local.h"
+#include "src/threadpool/thread_pool.h"
+#include "ps/ps.h"
 
 
 class W{
