@@ -1,5 +1,5 @@
 #include "iostream"
-#include "ps.h"
+#include "ps/ps.h"
 #include <time.h>
 
 float alpha = 5e-2;
