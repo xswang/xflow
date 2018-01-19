@@ -16,15 +16,15 @@
 #include "ps/ps.h"
 
 
-class W{
+class FFMWorker{
  public:
-  W(const char *train_file,
+  FFMWorker(const char *train_file,
     const char *test_file) :
                            train_file_path(train_file),
                            test_file_path(test_file) {
     kv_ = new ps::KVWorker<float>(0);
   }
-  ~W() {}
+  ~FFMWorker() {}
 
   float sigmoid(float x){
     if(x < -30) return 1e-6;
@@ -87,7 +87,7 @@ class W{
       }
       ++line_num;
     }
-    std::sort(all_keys.begin(), all_keys.end(), W::sort_finder);
+    std::sort(all_keys.begin(), all_keys.end(), FFMWorker::sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     auto w = std::make_shared<std::vector<float>>();
@@ -137,7 +137,7 @@ class W{
       for(int i = 0; i < core_num; ++i){
         int start = i * thread_size;
         int end = (i + 1)* thread_size;
-        pool.enqueue(std::bind(&W::calculate_pctr, this, start, end));
+        pool.enqueue(std::bind(&FFMWorker::calculate_pctr, this, start, end));
       }//end all batch
       while(calculate_pctr_thread_finish_num > 0) usleep(10);
     }//end while
@@ -163,7 +163,7 @@ class W{
       }
       ++line_num;
     }
-    std::sort(all_keys.begin(), all_keys.end(), W::sort_finder);
+    std::sort(all_keys.begin(), all_keys.end(), FFMWorker::sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
@@ -224,7 +224,7 @@ class W{
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
-          pool.enqueue(std::bind(&W::calculate_batch_gradient_threadpool, this, start, end));
+          pool.enqueue(std::bind(&FFMWorker::calculate_batch_gradient_threadpool, this, start, end));
         }
         while(gradient_thread_finish_num > 0){
           usleep(5);
