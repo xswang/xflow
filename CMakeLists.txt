@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
 
 # projectname is the same as the main-executable
-project(logistic_regression_ps)
+project(xflow)
 
 add_definitions('-g')
 add_definitions('-Wall')
