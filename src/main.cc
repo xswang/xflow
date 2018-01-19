@@ -1,4 +1,6 @@
 #include "src/lr_worker.h"
+#include "src/fm_worker.h"
+#include "src/ffm_worker.h"
 #include "src/server.h"
 
 #include "ps/ps.h"
@@ -12,8 +14,8 @@ int main(int argc,char *argv[]){
   }
   ps::Start();
   if (ps::IsWorker()) {
-    W* worker = new W(argv[1], argv[2]);
-    worker->P();
+    LRWorker* lr_worker = new LRWorker(argv[1], argv[2]);
+    lr_worker->train();
   }
   ps::Finalize();
 }
