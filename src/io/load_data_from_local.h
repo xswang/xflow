@@ -4,7 +4,7 @@
 #include <set>
 #include <string.h>
 
-namespace dml{
+namespace xflow{
 
 class LoadData : public IO{
  public:

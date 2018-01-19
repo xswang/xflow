@@ -4,7 +4,7 @@
 #include <functional>
 #include <vector>
 
-namespace dml{
+namespace xflow{
 
 struct kv{
   int fgid;

@@ -13,6 +13,7 @@
 #include <atomic>
 #include <unistd.h>
 
+namespace xflow{
 class ThreadPool {
 public:
     ThreadPool(size_t);
@@ -100,5 +101,6 @@ inline ThreadPool::~ThreadPool()
     for(std::thread &worker: workers)
         worker.join();
 }
-
+}
 #endif
+
