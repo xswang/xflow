@@ -22,7 +22,8 @@ class FMWorker{
     const char *test_file) :
                            train_file_path(train_file),
                            test_file_path(test_file) {
-    kv_ = new ps::KVWorker<float>(0);
+    kv_w = new ps::KVWorker<float>(0);
+    kv_v = new ps::KVWorker<float>(1);
   }
   ~FMWorker() {}
 
@@ -92,7 +93,7 @@ class FMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     auto w = std::make_shared<std::vector<float>>();
     int keys_size = (unique_keys).size();
-    kv_->Wait(kv_->Pull(unique_keys, &(*w)));
+    kv_w->Wait(kv_w->Pull(unique_keys, &(*w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
@@ -169,7 +170,7 @@ class FMWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>();
-    kv_->Wait(kv_->Pull(unique_keys, &(w)));
+    kv_w->Wait(kv_w->Pull(unique_keys, &(w)));
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -206,7 +207,7 @@ class FMWorker{
       (push_gradient)[i] /= 1.0 * line_num;
     }
 
-    kv_->Wait(kv_->Push(unique_keys, push_gradient));
+    kv_w->Wait(kv_w->Push(unique_keys, push_gradient));
     --gradient_thread_finish_num;
   }
 
@@ -270,6 +271,7 @@ class FMWorker{
   char train_data_path[1024];
   char test_data_path[1024];
   float bias = 0.0;
-  ps::KVWorker<float>* kv_;
+  ps::KVWorker<float>* kv_w;
+  ps::KVWorker<float>* kv_v;
 };//end class worker
 }
