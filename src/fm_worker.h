@@ -19,9 +19,9 @@ namespace xflow{
 class FMWorker{
  public:
   FMWorker(const char *train_file,
-    const char *test_file) :
-                           train_file_path(train_file),
-                           test_file_path(test_file) {
+           const char *test_file) :
+           train_file_path(train_file),
+           test_file_path(test_file) {
     kv_w = new ps::KVWorker<float>(0);
     kv_v = new ps::KVWorker<float>(1);
   }
@@ -238,7 +238,7 @@ class FMWorker{
     }
   }
 
-  void P(){
+  void train(){
     rank = ps::MyRank();
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);

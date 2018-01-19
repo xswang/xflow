@@ -238,7 +238,7 @@ class FFMWorker{
     }
   }
 
-  void P(){
+  void train(){
     rank = ps::MyRank();
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
