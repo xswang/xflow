@@ -5,7 +5,9 @@
 2. Install
     
     mkdir build
+
     cd build 
+
     cmake ..
     
 3. todo:
