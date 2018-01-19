@@ -15,7 +15,7 @@
 #include "src/threadpool/thread_pool.h"
 #include "ps/ps.h"
 
-
+namespace xflow{
 class FMWorker{
  public:
   FMWorker(const char *train_file,
@@ -126,7 +126,7 @@ class FMWorker{
     if(!md.is_open()) std::cout<<"open pred file failure!"<<std::endl;
 
     snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-    dml::LoadData test_data_loader(test_data_path, ((size_t)4)<<16);
+    xflow::LoadData test_data_loader(test_data_path, ((size_t)4)<<16);
     test_data = &(test_data_loader.m_data);
     test_auc_vec.clear();
     while(true){
@@ -213,7 +213,7 @@ class FMWorker{
   void batch_learning_threadpool(){
     ThreadPool pool(core_num);
     for(int epoch = 0; epoch < epochs; ++epoch){
-      dml::LoadData train_data_loader(train_data_path, block_size<<20);
+      xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
       int block = 0;
       while(1){
@@ -263,8 +263,8 @@ class FMWorker{
 
   std::ofstream md;
   std::mutex mutex;
-  dml::Data *train_data;
-  dml::Data *test_data;
+  xflow::Data *train_data;
+  xflow::Data *test_data;
   const char *train_file_path;
   const char *test_file_path;
   char train_data_path[1024];
@@ -272,4 +272,4 @@ class FMWorker{
   float bias = 0.0;
   ps::KVWorker<float>* kv_;
 };//end class worker
-
+}

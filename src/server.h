@@ -2,6 +2,7 @@
 #include "ps/ps.h"
 #include <time.h>
 
+namespace xflow{
 float alpha = 5e-2;
 float beta = 1.0;
 float lambda1 = 5e-5;
@@ -63,13 +64,14 @@ struct KVServerFTRLHandle {
   std::unordered_map<ps::Key, ftrlentry> store;
 };
 
-class S{
+class Server{
  public:
-  S(){
+  Server(){
     auto server_ = new ps::KVServer<float>(0);
     server_->set_request_handle(KVServerFTRLHandle());
     std::cout << "init server success " << std::endl;
   }
-  ~S(){}
+  ~Server(){}
   ps::KVServer<float>* server_;
 };//end class Server
+}
