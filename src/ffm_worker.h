@@ -23,7 +23,7 @@ class FFMWorker{
                            train_file_path(train_file),
                            test_file_path(test_file) {
     kv_w = new ps::KVWorker<float>(0);
-    kv_v = new ps::KVWorker<float>(1)
+    kv_v = new ps::KVWorker<float>(1);
   }
   ~FFMWorker() {}
 
