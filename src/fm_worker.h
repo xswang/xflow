@@ -25,6 +25,8 @@ class FMWorker{
     kv_w = new ps::KVWorker<float>(0);
     kv_v = new ps::KVWorker<float>(1);
     base_ = new Base;
+    core_num = std::thread::hardware_concurrency();
+    pool_ = new ThreadPool(core_num);
   }
   ~FMWorker() {}
 
@@ -75,7 +77,7 @@ class FMWorker{
     --calculate_pctr_thread_finish_num;
  }//calculate_pctr
 
-  void predict(ThreadPool &pool, int rank, int block){
+  void predict(ThreadPool* pool, int rank, int block){
     char buffer[1024];
     snprintf(buffer, 1024, "%d_%d", rank, block);
     std::string filename = buffer;
@@ -94,7 +96,7 @@ class FMWorker{
       for(int i = 0; i < core_num; ++i){
         int start = i * thread_size;
         int end = (i + 1)* thread_size;
-        pool.enqueue(std::bind(&FMWorker::calculate_pctr, this, start, end));
+        pool->enqueue(std::bind(&FMWorker::calculate_pctr, this, start, end));
       }//end all batch
       while(calculate_pctr_thread_finish_num > 0) usleep(10);
     }//end while
@@ -103,7 +105,7 @@ class FMWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
-  void calculate_batch_gradient_threadpool(int start, int end){
+  void calculate_gradient(int start, int end){
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
@@ -167,8 +169,7 @@ class FMWorker{
     --gradient_thread_finish_num;
   }
 
-  void batch_learning_threadpool(){
-    ThreadPool pool(core_num);
+  void batch_training(ThreadPool* pool){
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
@@ -181,14 +182,13 @@ class FMWorker{
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
-          pool.enqueue(std::bind(&FMWorker::calculate_batch_gradient_threadpool, this, start, end));
+          pool->enqueue(std::bind(&FMWorker::calculate_gradient, this, start, end));
         }
         while(gradient_thread_finish_num > 0){
           usleep(5);
         }
         ++block;
       }
-      if (rank == 0) predict(pool, rank, 0);
       std::cout << "epoch : " << epoch << std::endl;
       train_data = NULL;
     }
@@ -198,8 +198,8 @@ class FMWorker{
     rank = ps::MyRank();
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
-    core_num = std::thread::hardware_concurrency();
-    batch_learning_threadpool();
+    batch_training(pool_);
+    if (rank == 0) predict(pool_, rank, 0);
     std::cout<<"train end......"<<std::endl;
   }
 
@@ -221,6 +221,7 @@ class FMWorker{
   std::ofstream md;
   std::mutex mutex;
   Base* base_;
+  ThreadPool* pool_;
   xflow::Data *train_data;
   xflow::Data *test_data;
   const char *train_file_path;
