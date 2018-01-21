@@ -13,6 +13,8 @@
 
 #include "src/io/load_data_from_local.h"
 #include "src/threadpool/thread_pool.h"
+#include "src/base/base.h"
+
 #include "ps/ps.h"
 
 namespace xflow{
@@ -23,17 +25,10 @@ class LRWorker{
                            train_file_path(train_file),
                            test_file_path(test_file) {
     kv_ = new ps::KVWorker<float>(0);
+    base_ = new Base;
   }
   ~LRWorker() {}
 
-  float sigmoid(float x){
-    if(x < -30) return 1e-6;
-    else if(x > 30) return 1.0;
-    else{
-      double ex = pow(2.718281828, x);
-      return ex / (1.0 + ex);
-    }
-  }
   struct sample_key{
     size_t fid;
     int sid;
@@ -106,7 +101,7 @@ class LRWorker{
       }
     }
     for(int i = 0; i < wx.size(); ++i){
-      float pctr = sigmoid(wx[i]);
+      float pctr = base_->sigmoid(wx[i]);
       auc_key ak;
       ak.label = test_data->label[start++];
       ak.pctr = pctr;
@@ -146,7 +141,7 @@ class LRWorker{
     calculate_auc(test_auc_vec);
   }//end predict 
 
-  void calculate_batch_gradient_threadpool(int start, int end){
+  void calculate_batch_gradient(int start, int end){
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
@@ -184,7 +179,7 @@ class LRWorker{
       }
     }
     for(int i = 0; i < wx.size(); i++){
-      pctr = sigmoid(wx[i]);
+      pctr = base_->sigmoid(wx[i]);
       float loss = pctr - train_data->label[start++];
       wx[i] = loss;
     }
@@ -210,7 +205,7 @@ class LRWorker{
     --gradient_thread_finish_num;
   }
 
-  void batch_learning_threadpool(){
+  void batch_learning(){
     ThreadPool pool(core_num);
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
@@ -224,7 +219,7 @@ class LRWorker{
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
-          pool.enqueue(std::bind(&LRWorker::calculate_batch_gradient_threadpool, this, start, end));
+          pool.enqueue(std::bind(&LRWorker::calculate_batch_gradient, this, start, end));
         }
         while(gradient_thread_finish_num > 0){
           usleep(5);
@@ -242,7 +237,7 @@ class LRWorker{
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     core_num = std::thread::hardware_concurrency();
-    batch_learning_threadpool();
+    batch_learning();
     std::cout<<"train end......"<<std::endl;
   }
 
@@ -263,13 +258,13 @@ class LRWorker{
 
   std::ofstream md;
   std::mutex mutex;
+  Base* base_;
   xflow::Data *train_data;
   xflow::Data *test_data;
   const char *train_file_path;
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  float bias = 0.0;
   ps::KVWorker<float>* kv_;
 };//end class worker
 }
