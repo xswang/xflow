@@ -24,61 +24,17 @@ class FFMWorker{
                            test_file_path(test_file) {
     kv_w = new ps::KVWorker<float>(0);
     kv_v = new ps::KVWorker<float>(1);
+    base_ = new Base;
   }
   ~FFMWorker() {}
 
-  float sigmoid(float x){
-    if(x < -30) return 1e-6;
-    else if(x > 30) return 1.0;
-    else{
-      double ex = pow(2.718281828, x);
-      return ex / (1.0 + ex);
-    }
-  }
-  struct sample_key{
-    size_t fid;
-    int sid;
-  };
-  static bool sort_finder(const sample_key& a, const sample_key& b){
-    return a.fid < b.fid;
-  }
-  static bool unique_finder(const sample_key& a, const sample_key& b){
-    return a.fid == b.fid;
-  }
-
-  struct auc_key{
-    int label;
-    float pctr;
-  };
-
-  void calculate_auc(std::vector<auc_key>& auc_vec){
-    std::sort(auc_vec.begin(), auc_vec.end(), [](const auc_key& a, const auc_key& b){
-        return a.pctr > b.pctr;
-        });
-    float area = 0.0; 
-    int tp_n = 0;
-    for(size_t i = 0; i < auc_vec.size(); ++i){
-      if(auc_vec[i].label == 1) tp_n += 1;
-      else area += tp_n;
-      logloss += auc_vec[i].label * std::log2(auc_vec[i].pctr) 
-                 + (1.0 - auc_vec[i].label) * std::log2(1.0 - auc_vec[i].pctr);
-    }
-    logloss /= auc_vec.size();
-    std::cout << "logloss: " << logloss << "\t";
-    if (tp_n == 0 || tp_n == auc_vec.size()) std::cout<<"tp_n = "<<tp_n<<std::endl;
-    else{
-      area /= 1.0 * (tp_n * (auc_vec.size() - tp_n));
-      std::cout<<"auc = "<<area<<"\ttp = "<<tp_n<<" fp = "<<(auc_vec.size() - tp_n)<<std::endl;
-    }
-  }
-
   void calculate_pctr(int start, int end){
-    auto all_keys = std::vector<sample_key>();
+    auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();
     int line_num = 0;
     for(int row = start; row < end; ++row) {
       int sample_size = test_data->fea_matrix[row].size();
-      sample_key sk;
+      Base::sample_key sk;
       sk.sid = line_num;
       for(int j = 0; j < sample_size; ++j) {
         size_t idx = test_data->fea_matrix[row][j].fid;
@@ -88,7 +44,7 @@ class FFMWorker{
       }
       ++line_num;
     }
-    std::sort(all_keys.begin(), all_keys.end(), FFMWorker::sort_finder);
+    std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     auto w = std::make_shared<std::vector<float>>();
@@ -107,8 +63,8 @@ class FFMWorker{
       }
     }
     for(int i = 0; i < wx.size(); ++i){
-      float pctr = sigmoid(wx[i]);
-      auc_key ak;
+      float pctr = base_->sigmoid(wx[i]);
+      Base::auc_key ak;
       ak.label = test_data->label[start++];
       ak.pctr = pctr;
       mutex.lock();
@@ -144,17 +100,17 @@ class FFMWorker{
     }//end while
     md.close();
     test_data = NULL;
-    calculate_auc(test_auc_vec);
+    base_->calculate_auc(test_auc_vec);
   }//end predict 
 
   void calculate_batch_gradient_threadpool(int start, int end){
     size_t idx = 0; float pctr = 0;
-    auto all_keys = std::vector<sample_key>();
+    auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
     int line_num = 0;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
-      sample_key sk;
+      Base::sample_key sk;
       sk.sid = line_num;
       for(int j = 0; j < sample_size; ++j){
         idx = train_data->fea_matrix[row][j].fid;
@@ -164,7 +120,7 @@ class FFMWorker{
       }
       ++line_num;
     }
-    std::sort(all_keys.begin(), all_keys.end(), FFMWorker::sort_finder);
+    std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
@@ -185,7 +141,7 @@ class FFMWorker{
       }
     }
     for(int i = 0; i < wx.size(); i++){
-      pctr = sigmoid(wx[i]);
+      pctr = base_->sigmoid(wx[i]);
       float loss = pctr - train_data->label[start++];
       wx[i] = loss;
     }
@@ -259,11 +215,12 @@ class FFMWorker{
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
   float logloss = 0.0;
-  std::vector<auc_key> auc_vec;
-  std::vector<auc_key> test_auc_vec;
+  std::vector<Base::auc_key> auc_vec;
+  std::vector<Base::auc_key> test_auc_vec;
 
   std::ofstream md;
   std::mutex mutex;
+  Base* base_;
   xflow::Data *train_data;
   xflow::Data *test_data;
   const char *train_file_path;
