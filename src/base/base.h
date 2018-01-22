@@ -7,6 +7,10 @@
 
 #ifndef BASE_H
 #define BASE_H
+
+#include <stddef.h>
+#include <vector>
+
 namespace xflow{
 class Base{
  public:
