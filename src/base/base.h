@@ -8,8 +8,10 @@
 #ifndef BASE_H
 #define BASE_H
 
+#include <iostream>
 #include <stddef.h>
 #include <vector>
+#include <cmath>
 
 namespace xflow{
 class Base{
