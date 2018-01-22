@@ -20,5 +20,6 @@ link_directories(
 )
 
 add_subdirectory(ps-lite)
-add_subdirectory(src)
-add_subdirectory(src/c_api)
+add_subdirectory(src/io)
+add_subdirectory(src/model)
+#add_subdirectory(src/c_api)
