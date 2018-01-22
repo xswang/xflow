@@ -23,10 +23,19 @@
 
 #define XFLOW_DLL XFLOW_EXTERN_C
 
-typedef void* XFLOW;
+XFLOW_DLL int XFlowCreate(void* h);
 
-XFLOW_DLL int XFlowSetTrainDataPath();
-XFLOW_DLL int XFlowSetTestDataPath();
-XFLOW_DLL int XFlowStartTrain();
+XFLOW_DLL int XFlowSetDataPath(void* h,
+                               const char* train_path,
+                               const char* test_path);
+XFLOW_DLL int XFlowStartTrain(void* h);
+
+class XFlow {
+ public:
+  XFlow() {}
+  ~XFlow() {}
+  
+  xflow::LRWorker lr_worker_;
+}；
 
 #endif /* !C_API_H */
