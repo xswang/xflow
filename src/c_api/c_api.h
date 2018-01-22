@@ -13,29 +13,31 @@
 #include "src/lr_worker.h"
 
 #ifdef __cplusplus
-#define XFLOW_EXTERN_C extern "C"
+#define XF_EXTERN_C extern "C"
 #include <cstdio>
 #else
-#define XFLOW_EXTERN_C
+#define XF_EXTERN_C
 #include <stdio.h>
 #include <stdint.h>
 #endif
 
-#define XFLOW_DLL XFLOW_EXTERN_C
+#define XF_DLL XF_EXTERN_C
 
-XFLOW_DLL int XFlowCreate(void* h);
-
-XFLOW_DLL int XFlowSetDataPath(void* h,
-                               const char* train_path,
-                               const char* test_path);
-XFLOW_DLL int XFlowStartTrain(void* h);
+XF_DLL int XFCreate(void* *h,
+                    const char* train_path,
+                    const char* test_path);
+XF_DLL int XFStartTrain(void* *h);
 
 class XFlow {
  public:
-  XFlow() {}
-  ~XFlow() {}
+  XFlow(const char* train, const char* test) {
+    lr_worker_ = new xflow::LRWorker(train, test);
+  }
+  ~XFlow() {
+    delete lr_worker_;
+  }
   
-  xflow::LRWorker lr_worker_;
-}；
+  xflow::LRWorker* lr_worker_;
+};
 
 #endif /* !C_API_H */
