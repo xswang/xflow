@@ -1,7 +1,7 @@
-#include "src/lr_worker.h"
-#include "src/fm_worker.h"
-#include "src/ffm_worker.h"
-#include "src/server.h"
+#include "src/model/lr_worker.h"
+#include "src/model/fm_worker.h"
+#include "src/model/ffm_worker.h"
+#include "src/model/server.h"
 
 #include "ps/ps.h"
 namespace xflow{
