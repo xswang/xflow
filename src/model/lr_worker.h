@@ -12,7 +12,7 @@
 #include <immintrin.h>
 
 #include "src/io/load_data_from_local.h"
-#include "src/threadpool/thread_pool.h"
+#include "src/base/thread_pool.h"
 #include "src/base/base.h"
 
 #include "ps/ps.h"
