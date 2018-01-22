@@ -21,4 +21,4 @@ link_directories(
 
 add_subdirectory(ps-lite)
 add_subdirectory(src)
-
+add_subdirectory(src/c_api)
