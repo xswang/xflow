@@ -128,6 +128,7 @@ class FMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
 
+    std::cout << "keys_size = " << keys_size << std::endl;
     auto w = std::vector<float>(keys_size);
     kv_w->Wait(kv_w->Pull(unique_keys, &w));
     //auto v = std::vector<float>(unique_keys.size() * v_dim_);
@@ -212,7 +213,7 @@ class FMWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 50;
+  int epochs = 20;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};

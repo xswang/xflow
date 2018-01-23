@@ -51,14 +51,15 @@ class LRWorker{
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
-    auto w = std::make_shared<std::vector<float>>(keys_size);
-    kv_->Wait(kv_->Pull(unique_keys, &(*w)));
+    //auto w = std::make_shared<std::vector<float>>(keys_size);
+    auto w = std::vector<float>(keys_size);
+    kv_->Wait(kv_->Pull(unique_keys, &(w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = (unique_keys)[i];
       if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (*w)[i];
+        wx[all_keys[j].sid] += (w)[i];
         ++j;
       }
       else if(allkeys_fid > weight_fid){

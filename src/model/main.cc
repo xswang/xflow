@@ -15,8 +15,10 @@ int main(int argc,char *argv[]){
   }
   ps::Start();
   if (ps::IsWorker()) {
-    xflow::LRWorker* lr_worker = new xflow::LRWorker(argv[1], argv[2]);
-    lr_worker->train();
+    //xflow::LRWorker* lr_worker = new xflow::LRWorker(argv[1], argv[2]);
+    //lr_worker->train();
+    xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
+    fm_worker->train();
   }
   ps::Finalize();
 }

@@ -32,9 +32,14 @@ struct KVServerFTRLHandle {
 
     if (req_meta.push) {
       CHECK_EQ(keys_size, vals_size / dim);
+      //std::cout << keys_size << "\t" << vals_size << " push dim = " << dim << std::endl;
+      v_dim = dim;
     } else {
       res.keys = req_data.keys;
       res.vals.resize(keys_size);
+      //std::cout << keys_size << "\t" << vals_size << " pull dim = " << dim << std::endl;
+      //std::cout << "v_dim = " << v_dim << std::endl;
+      dim = v_dim;
     }
 
     for (size_t i = 0; i < keys_size; ++i) {
