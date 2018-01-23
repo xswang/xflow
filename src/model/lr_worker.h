@@ -50,8 +50,8 @@ class LRWorker{
     std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-    auto w = std::make_shared<std::vector<float>>();
     int keys_size = (unique_keys).size();
+    auto w = std::make_shared<std::vector<float>>(keys_size);
     kv_->Wait(kv_->Pull(unique_keys, &(*w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
