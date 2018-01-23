@@ -128,7 +128,9 @@ class FMWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>();
-    kv_w->Wait(kv_w->Pull(unique_keys, &(w)));
+    kv_w->Wait(kv_w->Pull(unique_keys, &w));
+    auto v = std::vector<float>(unique_keys.size() * v_dim_);
+    kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -228,7 +230,7 @@ class FMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  float bias = 0.0;
+  int v_dim_ = 4;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
