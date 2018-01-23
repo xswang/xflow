@@ -22,21 +22,27 @@ typedef struct FTRLEntry{
 } ftrlentry;
 
 struct KVServerFTRLHandle {
-  void operator()(const ps::KVMeta& req_meta, const ps::KVPairs<float>& req_data, ps::KVServer<float>* server) {
-    size_t n = req_data.keys.size();
+  void operator()(const ps::KVMeta& req_meta, 
+                  const ps::KVPairs<float>& req_data, 
+                  ps::KVServer<float>* server) {
+    size_t keys_size = req_data.keys.size();
+    size_t vals_size = req_data.vals.size();
+    int dim = vals_size / keys_size;
     ps::KVPairs<float> res;
+
     if (req_meta.push) {
-      CHECK_EQ(n, req_data.vals.size());
+      CHECK_EQ(keys_size, vals_size / dim);
     } else {
       res.keys = req_data.keys;
-      res.vals.resize(n);
+      res.vals.resize(keys_size);
     }
-    for (size_t i = 0; i < n; ++i) {
+
+    for (size_t i = 0; i < keys_size; ++i) {
       ps::Key key = req_data.keys[i];
       FTRLEntry& val = store[key];
-      for (int j = 0; j < 1; ++j){
+      for (int j = 0; j < dim; ++j){
         if (req_meta.push) {
-          float g = req_data.vals[i * v_dim + j];
+          float g = req_data.vals[i * dim + j];
           float old_n = val.n[j];
           float n = old_n + g * g;
           val.z[j] += g - (std::sqrt(n) - std::sqrt(old_n)) / alpha * val.w[j];
@@ -51,8 +57,8 @@ struct KVServerFTRLHandle {
             val.w[j] = tmpr / tmpl;
           }
         } else {
-          for (int j = 0; j < 1; ++j) {
-            res.vals[i * v_dim + j] = val.w[j];
+          for (int j = 0; j < dim; ++j) {
+            res.vals[i * dim + j] = val.w[j];
           }
         }
       }

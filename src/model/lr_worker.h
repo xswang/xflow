@@ -128,7 +128,7 @@ class LRWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
 
-    auto w = std::vector<float>();
+    auto w = std::vector<float>(keys_size);
     kv_->Wait(kv_->Pull(unique_keys, &(w)));
 
     auto wx = std::vector<float>(end - start);
