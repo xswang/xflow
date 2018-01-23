@@ -49,8 +49,9 @@ class FMWorker{
     std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-    auto w = std::make_shared<std::vector<float>>();
+
     int keys_size = (unique_keys).size();
+    auto w = std::make_shared<std::vector<float>>(keys_size);
     kv_w->Wait(kv_w->Pull(unique_keys, &(*w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -127,11 +128,12 @@ class FMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
 
-    auto w = std::vector<float>();
+    auto w = std::vector<float>(keys_size);
     kv_w->Wait(kv_w->Pull(unique_keys, &w));
-    auto v = std::vector<float>(unique_keys.size() * v_dim_);
-    kv_v->Wait(kv_v->Pull(unique_keys, &v));
+    //auto v = std::vector<float>(unique_keys.size() * v_dim_);
+    //kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
+    
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
@@ -230,7 +232,7 @@ class FMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  int v_dim_ = 4;
+  //int v_dim_ = 4;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
