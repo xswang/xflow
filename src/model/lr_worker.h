@@ -24,7 +24,7 @@ class LRWorker{
     const char *test_file) :
                            train_file_path(train_file),
                            test_file_path(test_file) {
-    kv_ = new ps::KVWorker<float>(0);
+    kv_w_ = new ps::KVWorker<float>(0);
     base_ = new Base;
     core_num = std::thread::hardware_concurrency();
     pool_ = new ThreadPool(core_num);
@@ -51,9 +51,8 @@ class LRWorker{
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
-    //auto w = std::make_shared<std::vector<float>>(keys_size);
     auto w = std::vector<float>(keys_size);
-    kv_->Wait(kv_->Pull(unique_keys, &(w)));
+    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
@@ -130,7 +129,7 @@ class LRWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>(keys_size);
-    kv_->Wait(kv_->Pull(unique_keys, &(w)));
+    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -167,11 +166,14 @@ class LRWorker{
       (push_gradient)[i] /= 1.0 * line_num;
     }
 
-    kv_->Wait(kv_->Push(unique_keys, push_gradient));
+    kv_w_->Wait(kv_w_->Push(unique_keys, push_gradient));
     --gradient_thread_finish_num;
   }
 
   void batch_training(ThreadPool* pool){
+    std::vector<ps::Key> keys(1);
+    std::vector<float> vals(1);
+    kv_w_->Wait(kv_w_->Push(keys, vals));
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
@@ -228,6 +230,6 @@ class LRWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  ps::KVWorker<float>* kv_;
+  ps::KVWorker<float>* kv_w_;
 };//end class worker
 }
