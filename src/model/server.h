@@ -27,19 +27,19 @@ struct KVServerFTRLHandle {
                   ps::KVServer<float>* server) {
     size_t keys_size = req_data.keys.size();
     size_t vals_size = req_data.vals.size();
-    int dim = vals_size / keys_size;
+    int dim = 0; 
     ps::KVPairs<float> res;
 
     if (req_meta.push) {
+      dim = vals_size / keys_size;
       CHECK_EQ(keys_size, vals_size / dim);
-      //std::cout << keys_size << "\t" << vals_size << " push dim = " << dim << std::endl;
-      v_dim = dim;
     } else {
       res.keys = req_data.keys;
       res.vals.resize(keys_size);
-      //std::cout << keys_size << "\t" << vals_size << " pull dim = " << dim << std::endl;
-      //std::cout << "v_dim = " << v_dim << std::endl;
-      dim = v_dim;
+      res.lens.resize(keys_size);
+      size_t vals_len_size = req_data.lens.size();
+      dim = vals_len_size / keys_size;
+      std::cout << "pull dim = " << dim << std::endl;
     }
 
     for (size_t i = 0; i < keys_size; ++i) {
@@ -71,7 +71,6 @@ struct KVServerFTRLHandle {
     server->Response(req_meta, res);
   }
  private:
-  //std::unordered_map<ps::Key, FTRLEntry> store;
   std::unordered_map<ps::Key, ftrlentry> store;
 };
 
