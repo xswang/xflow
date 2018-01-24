@@ -41,7 +41,6 @@ struct KVServerFTRLHandle_w {
     for (size_t i = 0; i < keys_size; ++i) {
       ps::Key key = req_data.keys[i];
       FTRLEntry_w& val = store[key];
-      std::cout << "val.w.size = " << val.w.size() << std::endl;
       for (int j = 0; j < w_dim; ++j){
         if (req_meta.push) {
           float g = req_data.vals[i * w_dim + j];
@@ -101,7 +100,6 @@ struct KVServerFTRLHandle_v {
     for (size_t i = 0; i < keys_size; ++i) {
       ps::Key key = req_data.keys[i];
       FTRLEntry_v& val = store[key];
-      std::cout << "val.v.size = " << val.w.size() << std::endl;
       for (int j = 0; j < v_dim; ++j){
         if (req_meta.push) {
           float g = req_data.vals[i * v_dim + j];
