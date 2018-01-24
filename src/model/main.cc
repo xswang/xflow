@@ -4,12 +4,8 @@
 #include "src/model/server.h"
 
 #include "ps/ps.h"
-namespace xflow{
-int v_dim;
-}
 
 int main(int argc,char *argv[]){
-  xflow::v_dim = 1;
   if (ps::IsServer()) {
     xflow::Server* server = new xflow::Server();
   }
