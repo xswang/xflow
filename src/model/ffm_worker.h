@@ -22,8 +22,8 @@ class FFMWorker{
     const char *test_file) :
                            train_file_path(train_file),
                            test_file_path(test_file) {
-    kv_w = new ps::KVWorker<float>(0);
-    kv_v = new ps::KVWorker<float>(1);
+    kv_w_ = new ps::KVWorker<float>(0);
+    kv_v_ = new ps::KVWorker<float>(1);
     base_ = new Base;
     core_num = std::thread::hardware_concurrency();
     pool_ = new ThreadPool(core_num);
@@ -51,7 +51,7 @@ class FFMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     auto w = std::make_shared<std::vector<float>>();
     int keys_size = (unique_keys).size();
-    kv_w->Wait(kv_w->Pull(unique_keys, &(*w)));
+    kv_w_->Wait(kv_w_->Pull(unique_keys, &(*w)));
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
@@ -128,7 +128,7 @@ class FFMWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>();
-    kv_w->Wait(kv_w->Pull(unique_keys, &(w)));
+    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
 
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -165,11 +165,17 @@ class FFMWorker{
       (push_gradient)[i] /= 1.0 * line_num;
     }
 
-    kv_w->Wait(kv_w->Push(unique_keys, push_gradient));
+    kv_w_->Wait(kv_w_->Push(unique_keys, push_gradient));
     --gradient_thread_finish_num;
   }
 
   void batch_training(ThreadPool* pool){
+    std::vector<ps::Key> keys(1);
+    std::vector<float> vals_w(1);
+    size_t v_dim = dim * fields;
+    std::vector<float> vals_v(v_dim);
+    kv_w_->Wait(kv_w_->Push(keys, vals_w));
+    kv_v_->Wait(kv_v_->Push(keys, vals_v));
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
@@ -228,8 +234,9 @@ class FFMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  float bias = 0.0;
-  ps::KVWorker<float>* kv_w;
-  ps::KVWorker<float>* kv_v;
+  size_t dim = 4;
+  size_t fields = 3;
+  ps::KVWorker<float>* kv_w_;
+  ps::KVWorker<float>* kv_v_;
 };//end class worker
 }
