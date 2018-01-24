@@ -52,8 +52,7 @@ class FMWorker{
 
     int keys_size = (unique_keys).size();
     auto w = std::vector<float>();
-    auto w_lens = std::vector<int>(keys_size);
-    kv_w->Wait(kv_w->Pull(unique_keys, &w, &w_lens));
+    kv_w->Wait(kv_w->Pull(unique_keys, &w));
 
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -130,10 +129,8 @@ class FMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
     int keys_size = (unique_keys).size();
 
-    std::cout << "keys_size = " << keys_size << std::endl;
     auto w = std::vector<float>();
-    auto w_lens = std::vector<int>(keys_size, 1);
-    kv_w->Wait(kv_w->Pull(unique_keys, &w, &w_lens));
+    kv_w->Wait(kv_w->Pull(unique_keys, &w));
     //auto v = std::vector<float>(unique_keys.size() * v_dim_);
     //kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
@@ -178,6 +175,11 @@ class FMWorker{
   }
 
   void batch_training(ThreadPool* pool){
+    std::vector<ps::Key> key(1);
+    std::vector<float> val_w(1);
+    std::vector<float> val_v(4);
+    kv_w->Wait(kv_w->Push(key, val_w));
+    kv_v->Wait(kv_v->Push(key, val_v));
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
