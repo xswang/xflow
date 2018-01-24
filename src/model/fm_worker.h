@@ -51,14 +51,16 @@ class FMWorker{
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
 
     int keys_size = (unique_keys).size();
-    auto w = std::make_shared<std::vector<float>>(keys_size);
-    kv_w->Wait(kv_w->Pull(unique_keys, &(*w)));
+    auto w = std::vector<float>();
+    auto w_lens = std::vector<int>(keys_size);
+    kv_w->Wait(kv_w->Pull(unique_keys, &w, &w_lens));
+
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = (unique_keys)[i];
       if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (*w)[i];
+        wx[all_keys[j].sid] += w[i];
         ++j;
       }
       else if(allkeys_fid > weight_fid){
@@ -129,8 +131,9 @@ class FMWorker{
     int keys_size = (unique_keys).size();
 
     std::cout << "keys_size = " << keys_size << std::endl;
-    auto w = std::vector<float>(keys_size);
-    kv_w->Wait(kv_w->Pull(unique_keys, &w));
+    auto w = std::vector<float>();
+    auto w_lens = std::vector<int>(keys_size, 1);
+    kv_w->Wait(kv_w->Pull(unique_keys, &w, &w_lens));
     //auto v = std::vector<float>(unique_keys.size() * v_dim_);
     //kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
@@ -140,7 +143,7 @@ class FMWorker{
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = (unique_keys)[i];
       if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (w)[i];
+        wx[all_keys[j].sid] += w[i];
         ++j;
       }
       else if(allkeys_fid > weight_fid){
