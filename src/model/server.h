@@ -95,9 +95,8 @@ struct KVServerFTRLHandle_v {
       CHECK_EQ(keys_size, vals_size / v_dim);
     } else {
       res.keys = req_data.keys;
-      res.vals.resize(keys_size);
+      res.vals.resize(keys_size * v_dim);
     }
-    //std::cout << "v_dim = " << v_dim << std::endl;
 
     for (size_t i = 0; i < keys_size; ++i) {
       ps::Key key = req_data.keys[i];
