@@ -155,16 +155,18 @@ class FMWorker{
       wx[i] = loss;
     }
 
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_w_gradient)[i] += wx[sid];
-        ++j;
-      }
-      else if(allkeys_fid > gradient_fid){
-        ++i;
+    for (size_t k = 0; k < v_dim_; ++k) {
+      for(int j = 0, i = 0; j < all_keys.size();){
+        size_t allkeys_fid = all_keys[j].fid;
+        size_t gradient_fid = (unique_keys)[i];
+        int sid = all_keys[j].sid;
+        if(allkeys_fid == gradient_fid){
+          (push_w_gradient)[i] += wx[sid];
+          ++j;
+        }
+        else if(allkeys_fid > gradient_fid){
+          ++i;
+        }
       }
     }
   }
