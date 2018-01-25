@@ -138,6 +138,9 @@ class FMWorker{
           float v_weight = v[feature_order * v_dim_ + k];
           v_sum[sid] += v_weight;
           v_pow_sum[sid] += v_weight * v_weight;
+          ++j;
+        } else if (allkeys_fid > weight_fid) {
+          ++i;
         }
       }
     }
@@ -147,7 +150,7 @@ class FMWorker{
     }
     // *
     for(int i = 0; i < wx.size(); i++){
-      float pctr = base_->sigmoid(wx[i]);
+      float pctr = base_->sigmoid(wx[i] + v_y[i]);
       float loss = pctr - train_data->label[start++];
       wx[i] = loss;
     }
