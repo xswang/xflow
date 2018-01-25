@@ -107,10 +107,49 @@ class FMWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
+  void calculate_loss(std::vector<float>& w,
+                      std::vector<float>& v,
+                      std::vector<Base::sample_key>& all_keys,
+                      std::vector<ps::Key>& unique_keys,
+                      size_t start,
+                      size_t end,
+                      std::vector<float>& push_w_gradient,
+                      std::vector<float>& push_v_gradient) {
+    auto wx = std::vector<float>(end - start);
+    for(int j = 0, i = 0; j < all_keys.size();) {
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t weight_fid = (unique_keys)[i];
+      if(allkeys_fid == weight_fid) {
+        wx[all_keys[j].sid] += (w)[i];
+        ++j;
+      } else if(allkeys_fid > weight_fid){
+        ++i;
+      }
+    }
+    for(int i = 0; i < wx.size(); i++){
+      float pctr = base_->sigmoid(wx[i]);
+      float loss = pctr - train_data->label[start++];
+      wx[i] = loss;
+    }
+
+    for(int j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t gradient_fid = (unique_keys)[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == gradient_fid){
+        (push_w_gradient)[i] += wx[sid];
+        ++j;
+      }
+      else if(allkeys_fid > gradient_fid){
+        ++i;
+      }
+    }
+  }
+
   void calculate_gradient(int start, int end){
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<Base::sample_key>();
-    auto unique_keys = std::vector<ps::Key>();;
+    auto unique_keys = std::vector<ps::Key>();
     int line_num = 0;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
@@ -131,53 +170,26 @@ class FMWorker{
 
     auto w = std::vector<float>();
     kv_w->Wait(kv_w->Pull(unique_keys, &w));
-    //auto v = std::vector<float>(unique_keys.size() * v_dim_);
-    //kv_v->Wait(kv_v->Pull(unique_keys, &v));
+    auto push_w_gradient = std::vector<float>(keys_size);
+    auto v = std::vector<float>();
+    kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
-    
-    auto wx = std::vector<float>(end - start);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = (unique_keys)[i];
-      if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += w[i];
-        ++j;
-      }
-      else if(allkeys_fid > weight_fid){
-        ++i;
-      }
-    }
-    for(int i = 0; i < wx.size(); i++){
-      pctr = base_->sigmoid(wx[i]);
-      float loss = pctr - train_data->label[start++];
-      wx[i] = loss;
+    auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
+
+  
+    calculate_loss(w, v, all_keys, unique_keys, start, end, push_w_gradient, push_v_gradient);
+    for(size_t i = 0; i < (push_w_gradient).size(); ++i){
+      (push_w_gradient)[i] /= 1.0 * line_num;
     }
 
-    auto push_gradient = std::vector<float>(keys_size);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_gradient)[i] += wx[sid];
-        ++j;
-      }
-      else if(allkeys_fid > gradient_fid){
-        ++i;
-      }
-    }
-    for(size_t i = 0; i < (push_gradient).size(); ++i){
-      (push_gradient)[i] /= 1.0 * line_num;
-    }
-
-    kv_w->Wait(kv_w->Push(unique_keys, push_gradient));
+    kv_w->Wait(kv_w->Push(unique_keys, push_w_gradient));
     --gradient_thread_finish_num;
   }
 
   void batch_training(ThreadPool* pool){
     std::vector<ps::Key> key(1);
     std::vector<float> val_w(1);
-    std::vector<float> val_v(4);
+    std::vector<float> val_v(v_dim_);
     kv_w->Wait(kv_w->Push(key, val_w));
     kv_v->Wait(kv_v->Push(key, val_v));
     for(int epoch = 0; epoch < epochs; ++epoch){
@@ -238,7 +250,7 @@ class FMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  //int v_dim_ = 4;
+  int v_dim_ = 4;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
