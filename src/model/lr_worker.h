@@ -106,8 +106,46 @@ class LRWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
+  void calculate_loss(std::vector<float>& w,
+                      std::vector<Base::sample_key>& all_keys,
+                      std::vector<ps::Key>& unique_keys,
+                      size_t start,
+                      size_t end,
+                      std::vector<float>& push_gradient) {
+    auto wx = std::vector<float>(end - start);
+    for(int j = 0, i = 0; j < all_keys.size();) {
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t weight_fid = (unique_keys)[i];
+      if(allkeys_fid == weight_fid) {
+        wx[all_keys[j].sid] += (w)[i];
+        ++j;
+      }   
+      else if(allkeys_fid > weight_fid){
+        ++i;
+      }   
+    }   
+    for(int i = 0; i < wx.size(); i++){
+      float pctr = base_->sigmoid(wx[i]);
+      float loss = pctr - train_data->label[start++];
+      wx[i] = loss;
+    }   
+
+    for(int j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t gradient_fid = (unique_keys)[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == gradient_fid){
+        (push_gradient)[i] += wx[sid];
+        ++j;
+      }   
+      else if(allkeys_fid > gradient_fid){
+        ++i;
+      }   
+    }   
+  }
+
   void calculate_gradient(int start, int end){
-    size_t idx = 0; float pctr = 0;
+    size_t idx = 0;
     auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
     int line_num = 0;
@@ -129,39 +167,10 @@ class LRWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>(keys_size);
-    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
-
-    auto wx = std::vector<float>(end - start);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = (unique_keys)[i];
-      if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (w)[i];
-        ++j;
-      }
-      else if(allkeys_fid > weight_fid){
-        ++i;
-      }
-    }
-    for(int i = 0; i < wx.size(); i++){
-      pctr = base_->sigmoid(wx[i]);
-      float loss = pctr - train_data->label[start++];
-      wx[i] = loss;
-    }
-
     auto push_gradient = std::vector<float>(keys_size);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_gradient)[i] += wx[sid];
-        ++j;
-      }
-      else if(allkeys_fid > gradient_fid){
-        ++i;
-      }
-    }
+    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
+    calculate_loss(w, all_keys, unique_keys, start, end, push_gradient);
+
     for(size_t i = 0; i < (push_gradient).size(); ++i){
       (push_gradient)[i] /= 1.0 * line_num;
     }
@@ -212,7 +221,7 @@ class LRWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 50;
+  int epochs = 60;
 
   std::atomic_llong gradient_thread_finish_num = {0};
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
