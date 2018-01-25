@@ -174,9 +174,9 @@ class FMWorker{
     kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
     auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
-
   
     calculate_loss(w, v, all_keys, unique_keys, start, end, push_w_gradient, push_v_gradient);
+
     for(size_t i = 0; i < (push_w_gradient).size(); ++i){
       (push_w_gradient)[i] /= 1.0 * line_num;
     }
