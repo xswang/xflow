@@ -19,11 +19,11 @@ namespace xflow{
 class FFMWorker{
  public:
   FFMWorker(const char *train_file,
-    const char *test_file) :
-                           train_file_path(train_file),
-                           test_file_path(test_file) {
-    kv_w_ = new ps::KVWorker<float>(0);
-    kv_v_ = new ps::KVWorker<float>(1);
+           const char *test_file) :
+           train_file_path(train_file),
+           test_file_path(test_file) {
+    kv_w = new ps::KVWorker<float>(0);
+    kv_v = new ps::KVWorker<float>(1);
     base_ = new Base;
     core_num = std::thread::hardware_concurrency();
     pool_ = new ThreadPool(core_num);
@@ -49,22 +49,24 @@ class FFMWorker{
     std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-    auto w = std::make_shared<std::vector<float>>();
+
     int keys_size = (unique_keys).size();
-    kv_w_->Wait(kv_w_->Pull(unique_keys, &(*w)));
+    auto w = std::vector<float>();
+    kv_w->Wait(kv_w->Pull(unique_keys, &w));
+
     auto wx = std::vector<float>(line_num);
-    for(int j = 0, i = 0; j < all_keys.size();){
+    for(size_t j = 0, i = 0; j < all_keys.size();){
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = (unique_keys)[i];
       if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (*w)[i];
+        wx[all_keys[j].sid] += w[i];
         ++j;
       }
       else if(allkeys_fid > weight_fid){
         ++i;
       }
     }
-    for(int i = 0; i < wx.size(); ++i){
+    for(size_t i = 0; i < wx.size(); ++i){
       float pctr = base_->sigmoid(wx[i]);
       Base::auc_key ak;
       ak.label = test_data->label[start++];
@@ -91,7 +93,7 @@ class FFMWorker{
     while(true){
       test_data_loader.load_minibatch_hash_data_fread();
       if(test_data->fea_matrix.size() <= 0) break;
-      int thread_size = test_data->fea_matrix.size() / core_num;
+      size_t thread_size = test_data->fea_matrix.size() / core_num;
       calculate_pctr_thread_finish_num = core_num;
       for(int i = 0; i < core_num; ++i){
         int start = i * thread_size;
@@ -105,10 +107,49 @@ class FFMWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
+  void calculate_loss(std::vector<float>& w,
+                      std::vector<float>& v,
+                      std::vector<Base::sample_key>& all_keys,
+                      std::vector<ps::Key>& unique_keys,
+                      size_t start,
+                      size_t end,
+                      std::vector<float>& push_w_gradient,
+                      std::vector<float>& push_v_gradient) {
+    auto wx = std::vector<float>(end - start);
+    for(size_t j = 0, i = 0; j < all_keys.size();) {
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t weight_fid = (unique_keys)[i];
+      if(allkeys_fid == weight_fid) {
+        wx[all_keys[j].sid] += (w)[i];
+        ++j;
+      } else if(allkeys_fid > weight_fid){
+        ++i;
+      }
+    }
+    for(size_t i = 0; i < wx.size(); i++){
+      float pctr = base_->sigmoid(wx[i]);
+      float loss = pctr - train_data->label[start++];
+      wx[i] = loss;
+    }
+
+    for(size_t j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t gradient_fid = (unique_keys)[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == gradient_fid){
+        (push_w_gradient)[i] += wx[sid];
+        ++j;
+      }
+      else if(allkeys_fid > gradient_fid){
+        ++i;
+      }
+    }
+  }
+
   void calculate_gradient(int start, int end){
     size_t idx = 0; float pctr = 0;
     auto all_keys = std::vector<Base::sample_key>();
-    auto unique_keys = std::vector<ps::Key>();;
+    auto unique_keys = std::vector<ps::Key>();
     int line_num = 0;
     for(int row = start; row < end; ++row){
       int sample_size = train_data->fea_matrix[row].size();
@@ -128,54 +169,30 @@ class FFMWorker{
     int keys_size = (unique_keys).size();
 
     auto w = std::vector<float>();
-    kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
+    kv_w->Wait(kv_w->Pull(unique_keys, &w));
+    auto push_w_gradient = std::vector<float>(keys_size);
+    auto v = std::vector<float>();
+    kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
-    auto wx = std::vector<float>(end - start);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = (unique_keys)[i];
-      if(allkeys_fid == weight_fid){
-        wx[all_keys[j].sid] += (w)[i];
-        ++j;
-      }
-      else if(allkeys_fid > weight_fid){
-        ++i;
-      }
-    }
-    for(int i = 0; i < wx.size(); i++){
-      pctr = base_->sigmoid(wx[i]);
-      float loss = pctr - train_data->label[start++];
-      wx[i] = loss;
+    auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
+
+  
+    calculate_loss(w, v, all_keys, unique_keys, start, end, push_w_gradient, push_v_gradient);
+    for(size_t i = 0; i < (push_w_gradient).size(); ++i){
+      (push_w_gradient)[i] /= 1.0 * line_num;
     }
 
-    auto push_gradient = std::vector<float>(keys_size);
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_gradient)[i] += wx[sid];
-        ++j;
-      }
-      else if(allkeys_fid > gradient_fid){
-        ++i;
-      }
-    }
-    for(size_t i = 0; i < (push_gradient).size(); ++i){
-      (push_gradient)[i] /= 1.0 * line_num;
-    }
-
-    kv_w_->Wait(kv_w_->Push(unique_keys, push_gradient));
+    kv_w->Wait(kv_w->Push(unique_keys, push_w_gradient));
     --gradient_thread_finish_num;
   }
 
   void batch_training(ThreadPool* pool){
-    std::vector<ps::Key> keys(1);
-    std::vector<float> vals_w(1);
-    size_t v_dim = dim * fields;
-    std::vector<float> vals_v(v_dim);
-    kv_w_->Wait(kv_w_->Push(keys, vals_w));
-    kv_v_->Wait(kv_v_->Push(keys, vals_v));
+    std::vector<ps::Key> key(1);
+    std::vector<float> val_w(1);
+    v_dim_ = dim_ * fields_;
+    std::vector<float> val_v(v_dim_);
+    kv_w->Wait(kv_w->Push(key, val_w));
+    kv_v->Wait(kv_v->Push(key, val_v));
     for(int epoch = 0; epoch < epochs; ++epoch){
       xflow::LoadData train_data_loader(train_data_path, block_size<<20);
       train_data = &(train_data_loader.m_data);
@@ -214,7 +231,7 @@ class FFMWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 50;
+  int epochs = 20;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
@@ -234,9 +251,10 @@ class FFMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  size_t dim = 4;
-  size_t fields = 3;
-  ps::KVWorker<float>* kv_w_;
-  ps::KVWorker<float>* kv_v_;
+  size_t dim_ = 4;
+  size_t fields_ = 3;
+  size_t v_dim_ = 0;
+  ps::KVWorker<float>* kv_w;
+  ps::KVWorker<float>* kv_v;
 };//end class worker
 }
