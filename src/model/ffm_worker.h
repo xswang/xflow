@@ -50,7 +50,6 @@ class FFMWorker{
     std::sort((unique_keys).begin(), (unique_keys).end());
     (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
 
-    int keys_size = (unique_keys).size();
     auto w = std::vector<float>();
     kv_w->Wait(kv_w->Pull(unique_keys, &w));
 
@@ -147,7 +146,7 @@ class FFMWorker{
   }
 
   void calculate_gradient(int start, int end){
-    size_t idx = 0; float pctr = 0;
+    size_t idx = 0;
     auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();
     int line_num = 0;
