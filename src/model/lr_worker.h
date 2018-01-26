@@ -221,7 +221,7 @@ class LRWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 60;
+  int epochs = 50;
 
   std::atomic_llong gradient_thread_finish_num = {0};
   std::atomic_llong calculate_pctr_thread_finish_num = {0};

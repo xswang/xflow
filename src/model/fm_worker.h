@@ -172,7 +172,7 @@ class FMWorker{
     for (size_t i = 0; i < end - start; ++i) {
       v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
     }
-    
+
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i] + v_y[i]);
       float loss = pctr - train_data->label[start++];
@@ -278,7 +278,7 @@ class FMWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 20;
+  int epochs = 50;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
