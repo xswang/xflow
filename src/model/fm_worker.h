@@ -298,7 +298,7 @@ class FMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  int v_dim_ = 4;
+  int v_dim_ = 10;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
