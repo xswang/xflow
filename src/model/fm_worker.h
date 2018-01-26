@@ -52,6 +52,8 @@ class FMWorker{
 
     auto w = std::vector<float>();
     kv_w->Wait(kv_w->Pull(unique_keys, &w));
+    auto v = std::vector<float>();
+    kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
     auto wx = std::vector<float>(line_num);
     for(int j = 0, i = 0; j < all_keys.size();){
@@ -65,6 +67,11 @@ class FMWorker{
         ++i;
       }
     }
+
+    auto v_sum = std::vector<float>(end - start);
+    auto v_pow_sum = std::vector<float>(end - start);
+
+
     for(int i = 0; i < wx.size(); ++i){
       float pctr = base_->sigmoid(wx[i]);
       Base::auc_key ak;
@@ -128,14 +135,13 @@ class FMWorker{
     // *  calculate latent v
     auto v_sum = std::vector<float>(end - start);
     auto v_pow_sum = std::vector<float>(end - start);
-    size_t feature_order = 0;
     for (size_t k = 0; k < v_dim_; k++) {
       for(size_t j = 0, i = 0; j < all_keys.size();) {
         size_t allkeys_fid = all_keys[j].fid;
         size_t weight_fid = unique_keys[i];
         if (allkeys_fid == weight_fid) {
           size_t sid = all_keys[j].sid;
-          float v_weight = v[feature_order * v_dim_ + k];
+          float v_weight = v[i * v_dim_ + k];
           v_sum[sid] += v_weight;
           v_pow_sum[sid] += v_weight * v_weight;
           ++j;
@@ -148,25 +154,24 @@ class FMWorker{
     for (size_t i = 0; i < end - start; ++i) {
       v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
     }
-    // *
+    
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i] + v_y[i]);
       float loss = pctr - train_data->label[start++];
       wx[i] = loss;
     }
 
-    for (size_t k = 0; k < v_dim_; ++k) {
-      for(int j = 0, i = 0; j < all_keys.size();){
-        size_t allkeys_fid = all_keys[j].fid;
-        size_t gradient_fid = (unique_keys)[i];
-        int sid = all_keys[j].sid;
-        if(allkeys_fid == gradient_fid){
-          (push_w_gradient)[i] += wx[sid];
-          ++j;
-        }
-        else if(allkeys_fid > gradient_fid){
-          ++i;
-        }
+    for(int j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t weight_fid = unique_keys[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == weight_fid){
+        (push_w_gradient)[i] += wx[sid];
+        push_v_gradient[i] += wx[sid] * (v_sum[sid] - unique_keys[i]);
+        ++j;
+      }
+      else if(allkeys_fid > weight_fid){
+        ++i;
       }
     }
   }
