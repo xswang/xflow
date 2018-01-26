@@ -70,10 +70,28 @@ class FMWorker{
 
     auto v_sum = std::vector<float>(end - start);
     auto v_pow_sum = std::vector<float>(end - start);
-
+    for (size_t k = 0; k < v_dim_; ++k) {
+      for (size_t j = 0, i = 0; j < all_keys.size();) {
+        size_t allkeys_fid = all_keys[j].fid;
+        size_t weight_fid = unique_keys[i];
+        if (allkeys_fid == weight_fid) {
+          size_t sid = all_keys[j].sid;
+          float v_weight = v[i * v_dim_ + k];
+          v_sum[sid] += v_weight;
+          v_pow_sum[sid] += v_weight * v_weight;
+          ++j;
+        } else if (allkeys_fid > weight_fid) {
+          ++i;
+        }
+      }
+    }
+    auto v_y = std::vector<float>(end - start);
+    for (size_t i = 0; i < end - start; ++i) {
+      v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
+    }
 
     for(int i = 0; i < wx.size(); ++i){
-      float pctr = base_->sigmoid(wx[i]);
+      float pctr = base_->sigmoid(wx[i] + v_y[i]);
       Base::auc_key ak;
       ak.label = test_data->label[start++];
       ak.pctr = pctr;
