@@ -172,6 +172,7 @@ class FMWorker{
     for (size_t i = 0; i < end - start; ++i) {
       v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
     }
+    std::cout << "v_sum = " << v_sum[0] << "\t" << v_sum[10] << std::endl;
 
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i] + v_y[i]);
@@ -185,7 +186,7 @@ class FMWorker{
       int sid = all_keys[j].sid;
       if(allkeys_fid == weight_fid){
         (push_w_gradient)[i] += wx[sid];
-        push_v_gradient[i] += wx[sid] * (v_sum[sid] - unique_keys[i]);
+        push_v_gradient[i] += wx[sid] * (v_sum[sid] - v[i]);
         ++j;
       }
       else if(allkeys_fid > weight_fid){
@@ -229,8 +230,13 @@ class FMWorker{
     for(size_t i = 0; i < (push_w_gradient).size(); ++i){
       (push_w_gradient)[i] /= 1.0 * line_num;
     }
+    for (size_t i = 0; i < push_v_gradient.size(); ++i) {
+      push_v_gradient[i] /= 1.0 * line_num;
+    }
 
     kv_w->Wait(kv_w->Push(unique_keys, push_w_gradient));
+    kv_v->Wait(kv_v->Push(unique_keys, push_v_gradient));
+
     --gradient_thread_finish_num;
   }
 
