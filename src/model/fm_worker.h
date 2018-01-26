@@ -259,7 +259,7 @@ class FMWorker{
         }
         ++block;
       }
-      std::cout << "epoch : " << epoch << std::endl;
+      if((epoch + 1) % 30 == 0) std::cout << "epoch : " << epoch << std::endl;
       train_data = NULL;
     }
   }
@@ -269,6 +269,7 @@ class FMWorker{
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     batch_training(pool_);
+    std::cout << "FM AUC: " << std::endl;
     if (rank == 0) predict(pool_, rank, 0);
     std::cout<<"train end......"<<std::endl;
   }
@@ -278,7 +279,7 @@ class FMWorker{
   int core_num;
   int batch_num;
   int block_size = 2;
-  int epochs = 50;
+  int epochs = 60;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
