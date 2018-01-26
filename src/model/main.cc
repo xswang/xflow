@@ -10,10 +10,17 @@ int main(int argc,char *argv[]){
   }
   ps::Start();
   if (ps::IsWorker()) {
-    xflow::LRWorker* lr_worker = new xflow::LRWorker(argv[1], argv[2]);
-    lr_worker->train();
-    //xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
-    //fm_worker->train();
+    int epochs = std::atoi(argv[4]);
+    if (*(argv[3]) == '0') {
+      xflow::LRWorker* lr_worker = new xflow::LRWorker(argv[1], argv[2]);
+      lr_worker->epochs = epochs;
+      lr_worker->train();
+    }
+    if (*(argv[3]) == '1') {
+      xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
+      fm_worker->epochs = epochs;
+      fm_worker->train();
+    }
   }
   ps::Finalize();
 }
