@@ -212,8 +212,10 @@ class LRWorker{
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     batch_training(pool_);
-    std::cout << "LR AUC: " << std::endl;
-    if (rank == 0) predict(pool_, rank, 0);
+    if (rank == 0) {
+      std::cout << "LR AUC: " << std::endl;
+      predict(pool_, rank, 0);
+    }
     std::cout<<"train end......"<<std::endl;
   }
 
