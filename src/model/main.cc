@@ -5,6 +5,12 @@
 #include "ps/ps.h"
 
 int main(int argc,char *argv[]){
+  if (argc != 5) {
+    std::cout << "sh run_ps_local.sh model_index epochs\n";
+    std::cout << "LR model expmple: sh run_ps_local.sh 0 100\n";
+    std::cout << "FM model expmple: sh run_ps_local.sh 1 100\n";
+    std::cout << std::endl;
+  }
   if (ps::IsServer()) {
     xflow::Server* server = new xflow::Server();
   }
