@@ -18,11 +18,13 @@ int main(int argc,char *argv[]){
   if (ps::IsWorker()) {
     int epochs = std::atoi(argv[4]);
     if (*(argv[3]) == '0') {
+      std::cout << "start LR " << std::endl;
       xflow::LRWorker* lr_worker = new xflow::LRWorker(argv[1], argv[2]);
       lr_worker->epochs = epochs;
       lr_worker->train();
     }
     if (*(argv[3]) == '1') {
+      std::cout << "start FM " << std::endl;
       xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
       fm_worker->epochs = epochs;
       fm_worker->train();
