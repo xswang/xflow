@@ -172,7 +172,6 @@ class FMWorker{
     for (size_t i = 0; i < end - start; ++i) {
       v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
     }
-    std::cout << "v_sum = " << v_sum[0] << "\t" << v_sum[10] << std::endl;
 
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i] + v_y[i]);
