@@ -73,7 +73,7 @@ struct KVServerFTRLHandle_w {
 
 typedef struct FTRLEntry_v{
   FTRLEntry_v(int k = v_dim) {
-    w.resize(k, 0.0);
+    w.resize(k, 0.001);
     n.resize(k, 0.0);
     z.resize(k, 0.0);
   };  
