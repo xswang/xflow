@@ -1,6 +1,5 @@
 #include "src/model/lr_worker.h"
 #include "src/model/fm_worker.h"
-#include "src/model/ffm_worker.h"
 #include "src/model/server.h"
 
 #include "ps/ps.h"
@@ -15,8 +14,6 @@ int main(int argc,char *argv[]){
     //lr_worker->train();
     xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
     fm_worker->train();
-    //xflow::FFMWorker* ffm_worker = new xflow::FFMWorker(argv[1], argv[2]);
-    //ffm_worker->train();
   }
   ps::Finalize();
 }
