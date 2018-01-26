@@ -178,18 +178,20 @@ class FMWorker{
       float loss = pctr - train_data->label[start++];
       wx[i] = loss;
     }
-
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = unique_keys[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == weight_fid){
-        (push_w_gradient)[i] += wx[sid];
-        push_v_gradient[i] += wx[sid] * (v_sum[sid] - v[i]);
-        ++j;
-      }
-      else if(allkeys_fid > weight_fid){
-        ++i;
+ 
+    for (size_t k = 0; k < v_dim_; ++k) {
+      for(int j = 0, i = 0; j < all_keys.size();){
+        size_t allkeys_fid = all_keys[j].fid;
+        size_t weight_fid = unique_keys[i];
+        int sid = all_keys[j].sid;
+        if(allkeys_fid == weight_fid){
+          (push_w_gradient)[i] += wx[sid];
+          push_v_gradient[i * v_dim_ + k] += wx[sid] * (v_sum[sid] - v[i * v_dim_ + k]);
+          ++j;
+        }
+        else if(allkeys_fid > weight_fid){
+          ++i;
+        }
       }
     }
   }
@@ -274,8 +276,10 @@ class FMWorker{
     std::cout << "my rank is = " << rank << std::endl;
     snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);
     batch_training(pool_);
-    std::cout << "FM AUC: " << std::endl;
-    if (rank == 0) predict(pool_, rank, 0);
+    if (rank == 0) {
+      std::cout << "FM AUC: " << std::endl;
+      predict(pool_, rank, 0);
+    }
     std::cout<<"train end......"<<std::endl;
   }
 
