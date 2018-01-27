@@ -11,7 +11,7 @@
 #include <memory>
 #include <immintrin.h>
 
-#include "src/io/load_data_from_local.h"
+#include "src/io/load_data_from_disk.h"
 #include "src/base/thread_pool.h"
 #include "ps/ps.h"
 
