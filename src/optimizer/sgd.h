@@ -38,7 +38,7 @@ class SGD {
         CHECK_EQ(keys_size, vals_size / w_dim);
       } else {
         res.keys = req_data.keys;
-        res.vals.resize(keys_size);
+        res.vals.resize(keys_size * w_dim);
       }
 
       for (size_t i = 0; i < keys_size; ++i) {
@@ -47,7 +47,7 @@ class SGD {
         for (int j = 0; j < w_dim; ++j){
           if (req_meta.push) {
             float g = req_data.vals[i * w_dim + j];
-            val.w[j] += learning_rate * g;
+            val.w[j] -= learning_rate * g;
           } else {
             for (int j = 0; j < w_dim; ++j) {
               res.vals[i * w_dim + j] = val.w[j];
@@ -90,7 +90,7 @@ class SGD {
         for (int j = 0; j < v_dim; ++j){
           if (req_meta.push) {
             float g = req_data.vals[i * v_dim + j];
-            val.w[j] += learning_rate * g;
+            val.w[j] -= learning_rate * g;
           } else {
             for (int j = 0; j < v_dim; ++j) {
               res.vals[i * v_dim + j] = val.w[j];

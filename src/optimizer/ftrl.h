@@ -45,7 +45,7 @@ class FTRL {
         CHECK_EQ(keys_size, vals_size / w_dim);
       } else {
         res.keys = req_data.keys;
-        res.vals.resize(keys_size);
+        res.vals.resize(keys_size * w_dim);
       }
 
       for (size_t i = 0; i < keys_size; ++i) {
