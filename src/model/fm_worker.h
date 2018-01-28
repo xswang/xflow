@@ -137,8 +137,8 @@ class FMWorker{
                       std::vector<ps::Key>& unique_keys,
                       size_t start,
                       size_t end,
-                      std::vector<float>& push_w_gradient,
-                      std::vector<float>& push_v_gradient) {
+                      std::vector<float>& v_sum,
+                      std::vector<float>& loss) {
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
@@ -151,7 +151,7 @@ class FMWorker{
       }
     }
     // *  calculate latent v
-    auto v_sum = std::vector<float>(end - start);
+    //auto v_sum = std::vector<float>(end - start);
     auto v_pow_sum = std::vector<float>(end - start);
     for (size_t k = 0; k < v_dim_; k++) {
       for(size_t j = 0, i = 0; j < all_keys.size();) {
@@ -175,28 +175,11 @@ class FMWorker{
 
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i] + v_y[i]);
-      float loss = pctr - train_data->label[start++];
-      wx[i] = loss;
-    }
- 
-    for (size_t k = 0; k < v_dim_; ++k) {
-      for(int j = 0, i = 0; j < all_keys.size();){
-        size_t allkeys_fid = all_keys[j].fid;
-        size_t weight_fid = unique_keys[i];
-        int sid = all_keys[j].sid;
-        if(allkeys_fid == weight_fid){
-          (push_w_gradient)[i] += wx[sid];
-          push_v_gradient[i * v_dim_ + k] += wx[sid] * (v_sum[sid] - v[i * v_dim_ + k]);
-          ++j;
-        }
-        else if(allkeys_fid > weight_fid){
-          ++i;
-        }
-      }
+      loss[i] = pctr - train_data->label[start++];
     }
   }
 
-  void calculate_gradient(int start, int end){
+  void update(int start, int end){
     size_t idx = 0;
     auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();
@@ -226,7 +209,25 @@ class FMWorker{
 
     auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
   
-    calculate_loss(w, v, all_keys, unique_keys, start, end, push_w_gradient, push_v_gradient);
+    auto loss = std::vector<float>(end - start);
+    auto v_sum = std::vector<float>(end - start);
+    calculate_loss(w, v, all_keys, unique_keys, start, end, v_sum, loss);
+
+    for (size_t k = 0; k < v_dim_; ++k) {
+      for(int j = 0, i = 0; j < all_keys.size();){
+        size_t allkeys_fid = all_keys[j].fid;
+        size_t weight_fid = unique_keys[i];
+        int sid = all_keys[j].sid;
+        if(allkeys_fid == weight_fid){
+          (push_w_gradient)[i] += loss[sid];
+          push_v_gradient[i * v_dim_ + k] += loss[sid] * (v_sum[sid] - v[i * v_dim_ + k]);
+          ++j;
+        }
+        else if(allkeys_fid > weight_fid){
+          ++i;
+        }
+      }
+    }
 
     for(size_t i = 0; i < (push_w_gradient).size(); ++i){
       (push_w_gradient)[i] /= 1.0 * line_num;
@@ -259,7 +260,7 @@ class FMWorker{
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
-          pool->enqueue(std::bind(&FMWorker::calculate_gradient, this, start, end));
+          pool->enqueue(std::bind(&FMWorker::update, this, start, end));
         }
         while(gradient_thread_finish_num > 0){
           usleep(5);
