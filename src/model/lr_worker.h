@@ -106,6 +106,27 @@ class LRWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
+  void calculate_gradient(std::vector<Base::sample_key>& all_keys,
+                          std::vector<ps::Key>& unique_keys,
+                          std::vector<float>& loss,
+                          std::vector<float>& push_gradient) {
+    for(int j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t gradient_fid = (unique_keys)[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == gradient_fid){
+        (push_gradient)[i] += loss[sid];
+        ++j;
+      }
+      else if(allkeys_fid > gradient_fid){
+        ++i;
+      }
+    }
+    for(size_t i = 0; i < (push_gradient).size(); ++i){
+      (push_gradient)[i] /= 1.0 * loss.size();
+    }
+  }
+
   void calculate_loss(std::vector<float>& w,
                       std::vector<Base::sample_key>& all_keys,
                       std::vector<ps::Key>& unique_keys,
@@ -157,22 +178,7 @@ class LRWorker{
     kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
     auto loss = std::vector<float>(end - start);
     calculate_loss(w, all_keys, unique_keys, start, end, loss);
-
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_gradient)[i] += loss[sid];
-        ++j;
-      }
-      else if(allkeys_fid > gradient_fid){
-        ++i;
-      }
-    }
-    for(size_t i = 0; i < (push_gradient).size(); ++i){
-      (push_gradient)[i] /= 1.0 * line_num;
-    }
+    calculate_gradient(all_keys, unique_keys, loss, push_gradient);
 
     kv_w_->Wait(kv_w_->Push(unique_keys, push_gradient));
     --gradient_thread_finish_num;
