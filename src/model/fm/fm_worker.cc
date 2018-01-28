@@ -11,12 +11,10 @@
 #include <memory>
 #include <immintrin.h>
 
-#include "src/io/load_data_from_disk.h"
-#include "src/base/thread_pool.h"
-#include "ps/ps.h"
+#include "src/model/fm/fm_worker.h"
 
 namespace xflow{
-void calculate_pctr(int start, int end){
+void FMWorker::calculate_pctr(int start, int end){
   auto all_keys = std::vector<Base::sample_key>();
   auto unique_keys = std::vector<ps::Key>();
   int line_num = 0;
@@ -89,7 +87,7 @@ void calculate_pctr(int start, int end){
   --calculate_pctr_thread_finish_num;
 }//calculate_pctr
 
-void predict(ThreadPool* pool, int rank, int block){
+void FMWorker::predict(ThreadPool* pool, int rank, int block){
   char buffer[1024];
   snprintf(buffer, 1024, "%d_%d", rank, block);
   std::string filename = buffer;
@@ -117,7 +115,7 @@ void predict(ThreadPool* pool, int rank, int block){
   base_->calculate_auc(test_auc_vec);
 }//end predict 
 
-void calculate_gradient(std::vector<Base::sample_key>& all_keys,
+void FMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
     std::vector<ps::Key>& unique_keys,
     size_t start, size_t end,
     std::vector<float>& v,
@@ -150,7 +148,7 @@ void calculate_gradient(std::vector<Base::sample_key>& all_keys,
   }
 }
 
-void calculate_loss(std::vector<float>& w,
+void FMWorker::calculate_loss(std::vector<float>& w,
     std::vector<float>& v,
     std::vector<Base::sample_key>& all_keys,
     std::vector<ps::Key>& unique_keys,
@@ -195,7 +193,7 @@ void calculate_loss(std::vector<float>& w,
   }
 }
 
-void update(int start, int end){
+void FMWorker::update(int start, int end){
   size_t idx = 0;
   auto all_keys = std::vector<Base::sample_key>();
   auto unique_keys = std::vector<ps::Key>();
@@ -236,7 +234,7 @@ void update(int start, int end){
   --gradient_thread_finish_num;
 }
 
-void batch_training(ThreadPool* pool){
+void FMWorker::batch_training(ThreadPool* pool){
   std::vector<ps::Key> key(1);
   std::vector<float> val_w(1);
   std::vector<float> val_v(v_dim_);
@@ -266,7 +264,7 @@ void batch_training(ThreadPool* pool){
   }
 }
 
-void train(){
+void FMWorker::train(){
   rank = ps::MyRank();
   std::cout << "my rank is = " << rank << std::endl;
   snprintf(train_data_path, 1024, "%s-%05d", train_file_path, rank);

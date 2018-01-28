@@ -13,6 +13,7 @@
 
 #include "src/io/load_data_from_disk.h"
 #include "src/base/thread_pool.h"
+#include "src/base/base.h"
 #include "ps/ps.h"
 
 namespace xflow{
@@ -57,14 +58,12 @@ class FMWorker{
  private:
   int rank;
   int core_num;
-  int batch_num;
   int block_size = 2;
 
   std::atomic_llong num_batch_fly = {0};
   std::atomic_llong gradient_thread_finish_num = {0};
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
-  float logloss = 0.0;
   std::vector<Base::auc_key> auc_vec;
   std::vector<Base::auc_key> test_auc_vec;
 
