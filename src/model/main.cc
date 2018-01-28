@@ -1,5 +1,5 @@
-#include "src/model/lr_worker.h"
-#include "src/model/fm_worker.h"
+#include "src/model/lr/lr_worker.h"
+#include "src/model/fm/fm_worker.h"
 #include "src/model/server.h"
 
 #include "ps/ps.h"
