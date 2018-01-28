@@ -131,6 +131,39 @@ class FMWorker{
     base_->calculate_auc(test_auc_vec);
   }//end predict 
 
+  void calculate_gradient(std::vector<Base::sample_key>& all_keys,
+                          std::vector<ps::Key>& unique_keys,
+                          size_t start, size_t end,
+                          std::vector<float>& v,
+                          std::vector<float>& v_sum,
+                          std::vector<float>& loss,
+                          std::vector<float>& push_w_gradient,
+                          std::vector<float>& push_v_gradient) {
+    for (size_t k = 0; k < v_dim_; ++k) {
+      for(int j = 0, i = 0; j < all_keys.size();){
+        size_t allkeys_fid = all_keys[j].fid;
+        size_t weight_fid = unique_keys[i];
+        int sid = all_keys[j].sid;
+        if(allkeys_fid == weight_fid){
+          (push_w_gradient)[i] += loss[sid];
+          push_v_gradient[i * v_dim_ + k] += loss[sid] * (v_sum[sid] - v[i * v_dim_ + k]);
+          ++j;
+        }
+        else if(allkeys_fid > weight_fid){
+          ++i;
+        }
+      }
+    }
+
+    size_t line_num = end - start;
+    for(size_t i = 0; i < (push_w_gradient).size(); ++i){
+      (push_w_gradient)[i] /= 1.0 * line_num;
+    }
+    for (size_t i = 0; i < push_v_gradient.size(); ++i) {
+      push_v_gradient[i] /= 1.0 * line_num;
+    }
+  }
+
   void calculate_loss(std::vector<float>& w,
                       std::vector<float>& v,
                       std::vector<Base::sample_key>& all_keys,
@@ -212,29 +245,7 @@ class FMWorker{
     auto loss = std::vector<float>(end - start);
     auto v_sum = std::vector<float>(end - start);
     calculate_loss(w, v, all_keys, unique_keys, start, end, v_sum, loss);
-
-    for (size_t k = 0; k < v_dim_; ++k) {
-      for(int j = 0, i = 0; j < all_keys.size();){
-        size_t allkeys_fid = all_keys[j].fid;
-        size_t weight_fid = unique_keys[i];
-        int sid = all_keys[j].sid;
-        if(allkeys_fid == weight_fid){
-          (push_w_gradient)[i] += loss[sid];
-          push_v_gradient[i * v_dim_ + k] += loss[sid] * (v_sum[sid] - v[i * v_dim_ + k]);
-          ++j;
-        }
-        else if(allkeys_fid > weight_fid){
-          ++i;
-        }
-      }
-    }
-
-    for(size_t i = 0; i < (push_w_gradient).size(); ++i){
-      (push_w_gradient)[i] /= 1.0 * line_num;
-    }
-    for (size_t i = 0; i < push_v_gradient.size(); ++i) {
-      push_v_gradient[i] /= 1.0 * line_num;
-    }
+    calculate_gradient(all_keys, unique_keys, start, end, v, v_sum, loss, push_w_gradient, push_v_gradient);
 
     kv_w->Wait(kv_w->Push(unique_keys, push_w_gradient));
     kv_v->Wait(kv_v->Push(unique_keys, push_v_gradient));
