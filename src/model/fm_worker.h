@@ -183,8 +183,6 @@ class FMWorker{
         ++i;
       }
     }
-    // *  calculate latent v
-    //auto v_sum = std::vector<float>(end - start);
     auto v_pow_sum = std::vector<float>(end - start);
     for (size_t k = 0; k < v_dim_; k++) {
       for(size_t j = 0, i = 0; j < all_keys.size();) {
