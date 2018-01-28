@@ -111,7 +111,7 @@ class LRWorker{
                       std::vector<ps::Key>& unique_keys,
                       size_t start,
                       size_t end,
-                      std::vector<float>& push_gradient) {
+                      std::vector<float>& loss) {
     auto wx = std::vector<float>(end - start);
     for(int j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
@@ -126,25 +126,11 @@ class LRWorker{
     }   
     for(int i = 0; i < wx.size(); i++){
       float pctr = base_->sigmoid(wx[i]);
-      float loss = pctr - train_data->label[start++];
-      wx[i] = loss;
-    }   
-
-    for(int j = 0, i = 0; j < all_keys.size();){
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t gradient_fid = (unique_keys)[i];
-      int sid = all_keys[j].sid;
-      if(allkeys_fid == gradient_fid){
-        (push_gradient)[i] += wx[sid];
-        ++j;
-      }   
-      else if(allkeys_fid > gradient_fid){
-        ++i;
-      }   
+      loss[i] = pctr - train_data->label[start++];
     }   
   }
 
-  void calculate_gradient(int start, int end){
+  void update(int start, int end){
     size_t idx = 0;
     auto all_keys = std::vector<Base::sample_key>();
     auto unique_keys = std::vector<ps::Key>();;
@@ -169,8 +155,21 @@ class LRWorker{
     auto w = std::vector<float>(keys_size);
     auto push_gradient = std::vector<float>(keys_size);
     kv_w_->Wait(kv_w_->Pull(unique_keys, &(w)));
-    calculate_loss(w, all_keys, unique_keys, start, end, push_gradient);
+    auto loss = std::vector<float>(end - start);
+    calculate_loss(w, all_keys, unique_keys, start, end, loss);
 
+    for(int j = 0, i = 0; j < all_keys.size();){
+      size_t allkeys_fid = all_keys[j].fid;
+      size_t gradient_fid = (unique_keys)[i];
+      int sid = all_keys[j].sid;
+      if(allkeys_fid == gradient_fid){
+        (push_gradient)[i] += loss[sid];
+        ++j;
+      }
+      else if(allkeys_fid > gradient_fid){
+        ++i;
+      }
+    }
     for(size_t i = 0; i < (push_gradient).size(); ++i){
       (push_gradient)[i] /= 1.0 * line_num;
     }
@@ -195,7 +194,7 @@ class LRWorker{
         for(int i = 0; i < core_num; ++i){
           int start = i * thread_size;
           int end = (i + 1)* thread_size;
-          pool->enqueue(std::bind(&LRWorker::calculate_gradient, this, start, end));
+          pool->enqueue(std::bind(&LRWorker::update, this, start, end));
         }
         while(gradient_thread_finish_num > 0){
           usleep(5);
