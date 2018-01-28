@@ -54,13 +54,11 @@ class LRWorker{
  private:
   int rank;
   int core_num;
-  int batch_num;
   int block_size = 2;
 
   std::atomic_llong gradient_thread_finish_num = {0};
   std::atomic_llong calculate_pctr_thread_finish_num = {0};
 
-  float logloss = 0.0;
   std::vector<Base::auc_key> test_auc_vec;
 
   std::ofstream md;
