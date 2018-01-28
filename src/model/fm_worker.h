@@ -168,8 +168,7 @@ class FMWorker{
                       std::vector<float>& v,
                       std::vector<Base::sample_key>& all_keys,
                       std::vector<ps::Key>& unique_keys,
-                      size_t start,
-                      size_t end,
+                      size_t start, size_t end,
                       std::vector<float>& v_sum,
                       std::vector<float>& loss) {
     auto wx = std::vector<float>(end - start);
