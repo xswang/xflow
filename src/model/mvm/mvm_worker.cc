@@ -11,7 +11,7 @@
 #include <memory>
 #include <immintrin.h>
 
-#include "src/model/lr/mvm_worker.h"
+#include "src/model/mvm/mvm_worker.h"
 
 namespace xflow{
 void MVMWorker::calculate_pctr(int start, int end){
