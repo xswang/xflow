@@ -24,10 +24,10 @@ class MVMWorker{
            const char *test_file) :
            train_file_path(train_file),
            test_file_path(test_file) {
-    kv_w = new ps::KVWorker<float>(0);
     kv_v = new ps::KVWorker<float>(1);
     base_ = new Base;
     core_num = std::thread::hardware_concurrency();
+    core_num = 1;
     pool_ = new ThreadPool(core_num);
   }
   ~MVMWorker() {}
@@ -39,16 +39,16 @@ class MVMWorker{
                           std::vector<ps::Key>& unique_keys,
                           size_t start, size_t end,
                           std::vector<float>& v,
-                          std::vector<std::vector<float>>& v_sum,
-                          std::vector<float>& v_multi,
+                          std::vector<std::vector<std::vector<float>>>& v_sum,
+                          std::vector<std::vector<float>>& v_multi,
                           std::vector<float>& loss,
                           std::vector<float>& push_v_gradient);
   void calculate_loss(std::vector<float>& v,
                       std::vector<Base::sample_key>& all_keys,
                       std::vector<ps::Key>& unique_keys,
                       size_t start, size_t end,
-                      std::vector<std::vector<float>>& v_sum,
-                      std::vector<float>& v_multi,
+                      std::vector<std::vector<std::vector<float>>>& v_sum,
+                      std::vector<std::vector<float>>& v_multi,
                       std::vector<float>& loss);
   void update(int start, int end);
   void batch_training(ThreadPool* pool);
@@ -79,7 +79,6 @@ class MVMWorker{
   char train_data_path[1024];
   char test_data_path[1024];
   int v_dim_ = 20;
-  ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
 }

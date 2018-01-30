@@ -43,11 +43,19 @@ void MVMWorker::calculate_pctr(int start, int end){
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
-  auto v_sum = std::vector<std::vector<float>>();
-  auto v_multi = std::vector<float>(end - start, 1.0);
-  for (int i = 0; i < sample_fgid_num.size(); ++i) {
-    auto fg_num = std::vector<float>(sample_fgid_num[i]);
-    v_sum.push_back(fg_num);
+  auto v_sum = std::vector<std::vector<std::vector<float>>>();
+  for (int k = 0; k < v_dim_; ++k) {
+    auto k_sum = std::vector<std::vector<float>>();
+    for (int i = 0; i < sample_fgid_num.size(); ++i) {
+      auto fg_num = std::vector<float>(sample_fgid_num[i]);
+      k_sum.push_back(fg_num);
+    }
+    v_sum.push_back(k_sum);
+  }
+  auto v_multi = std::vector<std::vector<float>>();
+  for(int k = 0; k < v_dim_; ++k) {
+    auto k_multi = std::vector<float>(end-start, 1.0);
+    v_multi.push_back(k_multi);
   }
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t j = 0, i = 0; j < all_keys.size();) {
@@ -57,21 +65,28 @@ void MVMWorker::calculate_pctr(int start, int end){
         size_t sid = all_keys[j].sid;
         size_t key_fgid = all_keys[j].fgid;
         float v_weight = v[i * v_dim_ + k];
-        v_sum[sid][key_fgid] += v_weight;
+        v_sum[k][sid][key_fgid] += v_weight;
         ++j;
       } else if (allkeys_fid > weight_fid) {
         ++i;
       }
     }
   }
-  for (size_t i = 0; i < end - start; ++i) {
-    for(size_t j = 0; j < v_sum[i].size(); ++j) {
-      v_multi[i] *= v_sum[i][j];
+  for (int k = 0; k < v_dim_; ++k) {
+    for (size_t i = 0; i < end - start; ++i) {
+      for(size_t j = 0; j < v_sum[i].size(); ++j) {
+        v_multi[k][i] *= v_sum[k][i][j];
+      }
     }
   }
 
+  auto v_y = std::vector<float>(end-start);
+  for (int i = 0; i < end-start; ++i) {
+    for (int j = 0; j < v_multi[i].size(); ++j)
+      v_y[i] += v_multi[j][i];
+  }
   for(int i = 0; i < v_multi.size(); ++i){
-    float pctr = base_->sigmoid(v_multi[i]);
+    float pctr = base_->sigmoid(v_y[i]);
     Base::auc_key ak;
     ak.label = test_data->label[start++];
     ak.pctr = pctr;
@@ -115,8 +130,8 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
     std::vector<ps::Key>& unique_keys,
     size_t start, size_t end,
     std::vector<float>& v,
-    std::vector<std::vector<float>>& v_sum,
-    std::vector<float>& v_multi,
+    std::vector<std::vector<std::vector<float>>>& v_sum,
+    std::vector<std::vector<float>>& v_multi,
     std::vector<float>& loss,
     std::vector<float>& push_v_gradient) {
   for (size_t k = 0; k < v_dim_; ++k) {
@@ -125,7 +140,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
       size_t weight_fid = unique_keys[i];
       int sid = all_keys[j].sid;
       if(allkeys_fid == weight_fid){
-        push_v_gradient[i * v_dim_ + k] += loss[sid] * (v_multi[sid] / v[i * v_dim_ + k]);
+        push_v_gradient[i * v_dim_ + k] += loss[sid] * (1.0 * v_multi[k][sid] / (1.0 + v[i * v_dim_ + k]));
         ++j;
       }
       else if(allkeys_fid > weight_fid){
@@ -137,6 +152,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
   size_t line_num = end - start;
   for (size_t i = 0; i < push_v_gradient.size(); ++i) {
     push_v_gradient[i] /= 1.0 * line_num;
+    //std::cout << "push_v_gradient = " << push_v_gradient[i] << std::endl;
   }
 }
 
@@ -144,32 +160,43 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     std::vector<Base::sample_key>& all_keys,
     std::vector<ps::Key>& unique_keys,
     size_t start, size_t end,
-    std::vector<std::vector<float>>& v_sum,
-    std::vector<float>& v_multi,
+    std::vector<std::vector<std::vector<float>>>& v_sum,
+    std::vector<std::vector<float>>& v_multi,
     std::vector<float>& loss) {
+  //std::cout << "v_sum[] size = " << v_sum[0][0] << std::endl;
+  float v_weight = 0.0;
+  size_t sid = 0, key_fgid = 0;
   for (size_t k = 0; k < v_dim_; k++) {
     for(size_t j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = unique_keys[i];
       if (allkeys_fid == weight_fid) {
-        size_t sid = all_keys[j].sid;
-        size_t key_fgid = all_keys[j].fgid;
-        float v_weight = v[i * v_dim_ + k];
-        v_sum[sid][key_fgid] += v_weight;
+        sid = all_keys[j].sid;
+        key_fgid = all_keys[j].fgid;
+        v_weight = v[i * v_dim_ + k];
+        v_sum[k][sid][key_fgid] += v_weight;
         ++j;
       } else if (allkeys_fid > weight_fid) {
         ++i;
       }
     }
   }
-  for (size_t i = 0; i < end - start; ++i) {
-    for (size_t j = 0; j < v_sum[i].size(); ++j) {
-      v_multi[i] *= v_sum[i][j];
+  auto v_y = std::vector<float>(end-start);
+  for (size_t k = 0; k < v_dim_; ++k) {
+    for (size_t i = 0; i < end - start; ++i) {
+      for (size_t j = 0; j < v_sum[i].size(); ++j) {
+        v_multi[k][i] *= v_sum[k][i][j];
+      }
+      //std::cout << "v_multi = " << v_multi[i] << std::endl;
     }
+  }
+  for (size_t i = 0; i < end - start; ++i) {
+    for (int j = 0; j < v_multi[i].size(); ++j)
+      v_y[i] += v_multi[j][i];
   }
 
   for(int i = 0; i < end - start; i++){
-    float pctr = base_->sigmoid(v_multi[i]);
+    float pctr = base_->sigmoid(v_y[i]);
     loss[i] = pctr - train_data->label[start++];
   }
 }
@@ -192,7 +219,7 @@ void MVMWorker::update(int start, int end){
       sample_fgid_map.insert({fgid, 1});
       sk.fid = idx;
       all_keys.push_back(sk);
-      (unique_keys).push_back(idx);
+      unique_keys.push_back(idx);
     }
     sample_fgid_num[line_num] = sample_fgid_map.size();
     ++line_num;
@@ -200,7 +227,7 @@ void MVMWorker::update(int start, int end){
   std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
   std::sort((unique_keys).begin(), (unique_keys).end());
   (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
-  int keys_size = (unique_keys).size();
+  int keys_size = unique_keys.size();
 
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
@@ -208,12 +235,21 @@ void MVMWorker::update(int start, int end){
   auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
 
   auto loss = std::vector<float>(end - start);
-  auto v_sum = std::vector<std::vector<float>> ();
-  auto v_multi = std::vector<float>(end - start, 1.0);
-  for (int i = 0; i < sample_fgid_num.size(); ++i) {
-    auto fg_num = std::vector<float>(sample_fgid_num[i]);
-    v_sum.push_back(fg_num);
+  auto v_multi = std::vector<std::vector<float>>();
+  for (size_t k = 0; k < v_dim_; ++k) {
+    auto k_multi = std::vector<float>(end-start, 1.0);
+    v_multi.push_back(k_multi);
   }
+  auto v_sum = std::vector<std::vector<std::vector<float>>> ();
+  for (int k = 0; k < v_dim_; ++k) {
+    auto k_sum = std::vector<std::vector<float>>();
+    for (int i = 0; i < sample_fgid_num.size(); ++i) {
+      auto fg_num = std::vector<float>(sample_fgid_num[i]);
+      k_sum.push_back(fg_num);
+    }
+    v_sum.push_back(k_sum);
+  }
+  std::cout << "v_sum size " << v_sum.size() << std::endl;
   calculate_loss(v, all_keys, unique_keys, start, end, v_sum, v_multi, loss);
   calculate_gradient(all_keys, unique_keys, start, end, v, v_sum, v_multi, loss, push_v_gradient);
 
@@ -244,6 +280,7 @@ void MVMWorker::batch_training(ThreadPool* pool){
         usleep(5);
       }
       ++block;
+      if(block == 3) break;
     }
     if((epoch + 1) % 30 == 0) std::cout << "epoch : " << epoch << std::endl;
     train_data = NULL;
