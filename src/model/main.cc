@@ -1,5 +1,6 @@
 #include "src/model/lr/lr_worker.h"
 #include "src/model/fm/fm_worker.h"
+#include "src/model/mvm/mvm_worker.h"
 #include "src/model/server.h"
 
 #include "ps/ps.h"
@@ -28,6 +29,12 @@ int main(int argc,char *argv[]){
       xflow::FMWorker* fm_worker = new xflow::FMWorker(argv[1], argv[2]);
       fm_worker->epochs = epochs;
       fm_worker->train();
+    }
+    if (*(argv[3]) == '2') {
+      std::cout<< "start MVM " << std::endl;
+      xflow::MVMWorker* mvm_worker = new xflow::MVMWorker(argv[1], argv[2]);
+      mvm_worker->epochs = epochs;
+      mvm_worker->train();
     }
   }
   ps::Finalize();
