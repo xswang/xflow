@@ -82,7 +82,7 @@ class FTRL {
 
   typedef struct FTRLEntry_v{
     FTRLEntry_v(int k = v_dim) {
-      w.resize(k, 0.001);
+      w.resize(k, 0.02);
       n.resize(k, 0.0);
       z.resize(k, 0.0);
     };
