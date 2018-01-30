@@ -70,7 +70,6 @@ void MVMWorker::calculate_pctr(int start, int end){
     }
   }
 
-  std::cout << "v_multi size = " << v_multi.size() << std::endl;
   for(int i = 0; i < v_multi.size(); ++i){
     float pctr = base_->sigmoid(v_multi[i]);
     Base::auc_key ak;
@@ -81,7 +80,6 @@ void MVMWorker::calculate_pctr(int start, int end){
     md<<pctr<<"\t"<<1 - ak.label<<"\t"<<ak.label<<std::endl;
     mutex.unlock();
   }
-  std::cout << "test_auc_vec size = " << test_auc_vec.size() << std::endl;
   --calculate_pctr_thread_finish_num;
 }//calculate_pctr
 
