@@ -44,7 +44,7 @@ void MVMWorker::calculate_pctr(int start, int end){
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
   auto v_sum = std::vector<std::vector<int>>();
-  auto v_multi = std::vector<int>(end - start);
+  auto v_multi = std::vector<int>(end - start, 1.0);
   for (int i = 0; i < sample_fgid_num.size(); ++i) {
     auto fg_num = std::vector<int>(sample_fgid_num[i]);
     v_sum.push_back(fg_num);
@@ -116,7 +116,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
     size_t start, size_t end,
     std::vector<float>& v,
     std::vector<std::vector<int>>& v_sum,
-    std::vector<int>& v_multi,
+    std::vector<float>& v_multi,
     std::vector<float>& loss,
     std::vector<float>& push_v_gradient) {
   for (size_t k = 0; k < v_dim_; ++k) {
@@ -145,7 +145,7 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     std::vector<ps::Key>& unique_keys,
     size_t start, size_t end,
     std::vector<std::vector<int>>& v_sum,
-    std::vector<int>& v_multi,
+    std::vector<float>& v_multi,
     std::vector<float>& loss) {
   for (size_t k = 0; k < v_dim_; k++) {
     for(size_t j = 0, i = 0; j < all_keys.size();) {
@@ -209,7 +209,7 @@ void MVMWorker::update(int start, int end){
 
   auto loss = std::vector<float>(end - start);
   auto v_sum = std::vector<std::vector<int>> ();
-  auto v_multi = std::vector<int>(end - start);
+  auto v_multi = std::vector<float>(end - start, 1.0);
   for (int i = 0; i < sample_fgid_num.size(); ++i) {
     auto fg_num = std::vector<int>(sample_fgid_num[i]);
     v_sum.push_back(fg_num);

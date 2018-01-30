@@ -40,7 +40,7 @@ class MVMWorker{
                           size_t start, size_t end,
                           std::vector<float>& v,
                           std::vector<std::vector<int>>& v_sum,
-                          std::vector<int>& v_multi,
+                          std::vector<float>& v_multi,
                           std::vector<float>& loss,
                           std::vector<float>& push_v_gradient);
   void calculate_loss(std::vector<float>& v,
@@ -48,7 +48,7 @@ class MVMWorker{
                       std::vector<ps::Key>& unique_keys,
                       size_t start, size_t end,
                       std::vector<std::vector<int>>& v_sum,
-                      std::vector<int>& v_multi,
+                      std::vector<float>& v_multi,
                       std::vector<float>& loss);
   void update(int start, int end);
   void batch_training(ThreadPool* pool);
@@ -78,7 +78,7 @@ class MVMWorker{
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  int v_dim_ = 10;
+  int v_dim_ = 20;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
 };//end class worker
