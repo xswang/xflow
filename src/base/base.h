@@ -29,6 +29,7 @@ class Base{
   }
 
   struct sample_key{
+    size_t fgid;
     size_t fid;
     int sid;
   };
