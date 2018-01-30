@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <memory>
 #include <immintrin.h>
+#include <map>
 
 #include "src/io/load_data_from_disk.h"
 #include "src/base/thread_pool.h"
@@ -38,14 +39,16 @@ class MVMWorker{
                           std::vector<ps::Key>& unique_keys,
                           size_t start, size_t end,
                           std::vector<float>& v,
-                          std::vector<float>& v_sum,
+                          std::vector<std::vector<int>>& v_sum,
+                          std::vector<int>& v_multi,
                           std::vector<float>& loss,
                           std::vector<float>& push_v_gradient);
   void calculate_loss(std::vector<float>& v,
                       std::vector<Base::sample_key>& all_keys,
                       std::vector<ps::Key>& unique_keys,
                       size_t start, size_t end,
-                      std::vector<float>& v_sum,
+                      std::vector<std::vector<int>>& v_sum,
+                      std::vector<int>& v_multi,
                       std::vector<float>& loss);
   void update(int start, int end);
   void batch_training(ThreadPool* pool);
