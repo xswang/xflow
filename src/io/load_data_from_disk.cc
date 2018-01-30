@@ -196,7 +196,9 @@ void LoadData::load_minibatch_hash_data_fread(){
       sample.push_back(keyval);
       ++q;
       p = q;
+      //std::cout << "fgid = " << keyval.fgid << std::endl;
     }
+    //return;
     m_data.fea_matrix.push_back(sample);
   }
 }
