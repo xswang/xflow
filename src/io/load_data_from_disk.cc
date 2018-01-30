@@ -115,8 +115,8 @@ void LoadData::load_minibatch_hash_data_fread(){
     }
   }
   else {
-    buf[bmax] = '\0';	
-  } 
+    buf[bmax] = '\0';
+  }
 
   char *p = &buf[0];
   while(*p != '\0'){
@@ -134,20 +134,65 @@ void LoadData::load_minibatch_hash_data_fread(){
       while(*q != ' ' && *q != '\n' && *q != '\0') ++q;
       if(*q == '\n'){
         *q = '\0';
-        keyval.fid = h(std::string(p));
+        char* pp = p;
+        char* qq = pp;
+        int field_index = 0;
+        while(*qq != '\0'){
+          while (*qq != ':') ++qq;
+          *qq = '\0';
+          if(field_index == 0) keyval.fgid = std::atof(pp);
+          if(field_index == 1){
+            keyval.fid = h(std::string(pp));
+            break;
+          }
+          ++qq;
+          pp = qq;
+          ++field_index;
+        }
+        //keyval.fid = h(std::string(p));
         sample.push_back(keyval);
         ++q;
         p = q;
         break;
       }
       if(*q == '\0'){
-        keyval.fid = h(std::string(p));
+        char* pp = p;
+        char* qq = pp;
+        int field_index = 0;
+        while(*qq != '\0'){
+          while (*qq != ':') ++qq;
+          *qq = '\0';
+          if(field_index == 0) keyval.fgid = std::atof(pp);
+          if(field_index == 1){
+            keyval.fid = h(std::string(pp));
+            break;
+          }
+          ++qq;
+          pp = qq;
+          ++field_index;
+        }
+        //keyval.fid = h(std::string(p));
         sample.push_back(keyval);
         p = q;
         break;
       }
       *q = '\0';
-      keyval.fid = h(std::string(p));
+      char* pp = p;
+      char* qq = pp;
+      int field_index = 0;
+      while(*qq != '\0'){
+        while (*qq != ':') ++qq;
+        *qq = '\0';
+        if(field_index == 0) keyval.fgid = std::atof(pp);
+        if(field_index == 1){
+          keyval.fid = h(std::string(pp));
+          break;
+        }
+        ++qq;
+        pp = qq;
+        ++field_index;
+      }
+      //keyval.fid = h(std::string(p));
       sample.push_back(keyval);
       ++q;
       p = q;
