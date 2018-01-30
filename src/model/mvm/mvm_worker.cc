@@ -17,17 +17,23 @@ namespace xflow{
 void MVMWorker::calculate_pctr(int start, int end){
   auto all_keys = std::vector<Base::sample_key>();
   auto unique_keys = std::vector<ps::Key>();
+  auto sample_fgid_num = std::vector<int>(end-start);
   int line_num = 0;
   for(int row = start; row < end; ++row) {
     int sample_size = test_data->fea_matrix[row].size();
     Base::sample_key sk;
     sk.sid = line_num;
+    auto sample_fgid_map = std::map<size_t, int>();
     for(int j = 0; j < sample_size; ++j) {
+      size_t fgid = test_data->fea_matrix[row][j].fgid;
       size_t idx = test_data->fea_matrix[row][j].fid;
+      sk.fgid = fgid;
+      sample_fgid_map.insert({fgid, 1});
       sk.fid = idx;
       all_keys.push_back(sk);
       (unique_keys).push_back(idx);
     }
+    sample_fgid_num[line_num] = sample_fgid_map.size();
     ++line_num;
   }
   std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
@@ -37,30 +43,36 @@ void MVMWorker::calculate_pctr(int start, int end){
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
-  auto v_sum = std::vector<float>(end - start);
-  auto v_pow_sum = std::vector<float>(end - start);
+  auto v_sum = std::vector<std::vector<int>>();
+  auto v_multi = std::vector<int>(end - start);
+  for (int i = 0; i < sample_fgid_num.size(); ++i) {
+    auto fg_num = std::vector<int>(sample_fgid_num[i]);
+    v_sum.push_back(fg_num);
+  }
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = unique_keys[i];
       if (allkeys_fid == weight_fid) {
         size_t sid = all_keys[j].sid;
+        size_t key_fgid = all_keys[j].fgid;
         float v_weight = v[i * v_dim_ + k];
-        v_sum[sid] += v_weight;
-        v_pow_sum[sid] += v_weight * v_weight;
+        v_sum[sid][key_fgid] += v_weight;
         ++j;
       } else if (allkeys_fid > weight_fid) {
         ++i;
       }
     }
   }
-  auto v_y = std::vector<float>(end - start);
   for (size_t i = 0; i < end - start; ++i) {
-    v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
+    for(size_t j = 0; j < v_sum[i].size(); ++j) {
+      v_multi[i] *= v_sum[i][j];
+    }
   }
 
-  for(int i = 0; i < v_y.size(); ++i){
-    float pctr = base_->sigmoid(v_y[i]);
+  std::cout << "v_multi size = " << v_multi.size() << std::endl;
+  for(int i = 0; i < v_multi.size(); ++i){
+    float pctr = base_->sigmoid(v_multi[i]);
     Base::auc_key ak;
     ak.label = test_data->label[start++];
     ak.pctr = pctr;
@@ -69,6 +81,7 @@ void MVMWorker::calculate_pctr(int start, int end){
     md<<pctr<<"\t"<<1 - ak.label<<"\t"<<ak.label<<std::endl;
     mutex.unlock();
   }
+  std::cout << "test_auc_vec size = " << test_auc_vec.size() << std::endl;
   --calculate_pctr_thread_finish_num;
 }//calculate_pctr
 
@@ -136,7 +149,6 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     std::vector<std::vector<int>>& v_sum,
     std::vector<int>& v_multi,
     std::vector<float>& loss) {
-  auto v_pow_sum = std::vector<float>(end - start);
   for (size_t k = 0; k < v_dim_; k++) {
     for(size_t j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
@@ -214,9 +226,7 @@ void MVMWorker::update(int start, int end){
 
 void MVMWorker::batch_training(ThreadPool* pool){
   std::vector<ps::Key> key(1);
-  std::vector<float> val_w(1);
   std::vector<float> val_v(v_dim_);
-  kv_w->Wait(kv_w->Push(key, val_w));
   kv_v->Wait(kv_v->Push(key, val_v));
   for(int epoch = 0; epoch < epochs; ++epoch){
     xflow::LoadData train_data_loader(train_data_path, block_size<<20);
