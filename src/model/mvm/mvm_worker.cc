@@ -34,23 +34,8 @@ void MVMWorker::calculate_pctr(int start, int end){
   std::sort((unique_keys).begin(), (unique_keys).end());
   (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()), (unique_keys).end());
 
-  auto w = std::vector<float>();
-  kv_w->Wait(kv_w->Pull(unique_keys, &w));
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
-
-  auto wx = std::vector<float>(line_num);
-  for(int j = 0, i = 0; j < all_keys.size();){
-    size_t allkeys_fid = all_keys[j].fid;
-    size_t weight_fid = (unique_keys)[i];
-    if(allkeys_fid == weight_fid){
-      wx[all_keys[j].sid] += w[i];
-      ++j;
-    }
-    else if(allkeys_fid > weight_fid){
-      ++i;
-    }
-  }
 
   auto v_sum = std::vector<float>(end - start);
   auto v_pow_sum = std::vector<float>(end - start);
@@ -74,8 +59,8 @@ void MVMWorker::calculate_pctr(int start, int end){
     v_y[i] = v_sum[i] * v_sum[i] - v_pow_sum[i];
   }
 
-  for(int i = 0; i < wx.size(); ++i){
-    float pctr = base_->sigmoid(wx[i] + v_y[i]);
+  for(int i = 0; i < v_y.size(); ++i){
+    float pctr = base_->sigmoid(v_y[i]);
     Base::auc_key ak;
     ak.label = test_data->label[start++];
     ak.pctr = pctr;
