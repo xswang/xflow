@@ -39,7 +39,7 @@ class MVMWorker{
                           std::vector<ps::Key>& unique_keys,
                           size_t start, size_t end,
                           std::vector<float>& v,
-                          std::vector<std::vector<int>>& v_sum,
+                          std::vector<std::vector<float>>& v_sum,
                           std::vector<float>& v_multi,
                           std::vector<float>& loss,
                           std::vector<float>& push_v_gradient);
@@ -47,7 +47,7 @@ class MVMWorker{
                       std::vector<Base::sample_key>& all_keys,
                       std::vector<ps::Key>& unique_keys,
                       size_t start, size_t end,
-                      std::vector<std::vector<int>>& v_sum,
+                      std::vector<std::vector<float>>& v_sum,
                       std::vector<float>& v_multi,
                       std::vector<float>& loss);
   void update(int start, int end);
