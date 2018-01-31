@@ -74,7 +74,7 @@ void MVMWorker::calculate_pctr(int start, int end){
   }
   for (int k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < end - start; ++i) {
-      for(size_t j = 0; j < v_sum[i].size(); ++j) {
+      for(size_t j = 0; j < v_sum[k][i].size(); ++j) {
         v_multi[k][i] *= v_sum[k][i][j];
       }
     }
@@ -82,7 +82,7 @@ void MVMWorker::calculate_pctr(int start, int end){
 
   auto v_y = std::vector<float>(end-start);
   for (int i = 0; i < end-start; ++i) {
-    for (int j = 0; j < v_multi[i].size(); ++j)
+    for (int j = 0; j < v_multi.size(); ++j)
       v_y[i] += v_multi[j][i];
   }
   for(int i = 0; i < v_multi.size(); ++i){
@@ -139,8 +139,11 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = unique_keys[i];
       int sid = all_keys[j].sid;
+      int fgid = all_keys[j].fgid;
       if(allkeys_fid == weight_fid){
-        push_v_gradient[i * v_dim_ + k] += loss[sid] * (1.0 * v_multi[k][sid] / (1.0 + v[i * v_dim_ + k]));
+        push_v_gradient[i * v_dim_ + k] +=
+          loss[sid] *
+          (1.0 * v_multi[k][sid] / (v_sum[k][sid][fgid]));
         ++j;
       }
       else if(allkeys_fid > weight_fid){
@@ -163,7 +166,6 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     std::vector<std::vector<std::vector<float>>>& v_sum,
     std::vector<std::vector<float>>& v_multi,
     std::vector<float>& loss) {
-  //std::cout << "v_sum[] size = " << v_sum[0][0] << std::endl;
   float v_weight = 0.0;
   size_t sid = 0, key_fgid = 0;
   for (size_t k = 0; k < v_dim_; k++) {
@@ -181,19 +183,21 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
       }
     }
   }
-  auto v_y = std::vector<float>(end-start);
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < end - start; ++i) {
-      for (size_t j = 0; j < v_sum[i].size(); ++j) {
+      for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
         v_multi[k][i] *= v_sum[k][i][j];
       }
-      //std::cout << "v_multi = " << v_multi[i] << std::endl;
     }
   }
+  
+  auto v_y = std::vector<float>(end-start);
   for (size_t i = 0; i < end - start; ++i) {
-    for (int j = 0; j < v_multi[i].size(); ++j)
+    for (size_t j = 0; j < v_multi.size(); ++j) {
       v_y[i] += v_multi[j][i];
+    }
   }
+  std::cout << "line 200 v_y[0] == " << v_y[0] << std::endl;
 
   for(int i = 0; i < end - start; i++){
     float pctr = base_->sigmoid(v_y[i]);
@@ -249,7 +253,6 @@ void MVMWorker::update(int start, int end){
     }
     v_sum.push_back(k_sum);
   }
-  std::cout << "v_sum size " << v_sum.size() << std::endl;
   calculate_loss(v, all_keys, unique_keys, start, end, v_sum, v_multi, loss);
   calculate_gradient(all_keys, unique_keys, start, end, v, v_sum, v_multi, loss, push_v_gradient);
 
@@ -280,7 +283,6 @@ void MVMWorker::batch_training(ThreadPool* pool){
         usleep(5);
       }
       ++block;
-      if(block == 3) break;
     }
     if((epoch + 1) % 30 == 0) std::cout << "epoch : " << epoch << std::endl;
     train_data = NULL;
