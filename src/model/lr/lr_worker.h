@@ -1,15 +1,26 @@
+/*
+ * lr_worker.h
+ * Copyright (C) 2018 wangxiaoshu <2012wxs@gmail.com>
+ *
+ * Distributed under terms of the MIT license.
+ */
+
+#ifndef SRC_MODEL_LR_LR_WORKER_H_
+#define SRC_MODEL_LR_LR_WORKER_H_
+
+#include <time.h>
+#include <unistd.h>
+#include <immintrin.h>
+
 #include <algorithm>
 #include <ctime>
 #include <iostream>
-
 #include <mutex>
 #include <functional>
 #include <random>
 #include <string>
-#include <time.h>
-#include <unistd.h>
+#include <vector>
 #include <memory>
-#include <immintrin.h>
 
 #include "src/io/load_data_from_disk.h"
 #include "src/base/thread_pool.h"
@@ -17,8 +28,8 @@
 
 #include "ps/ps.h"
 
-namespace xflow{
-class LRWorker{
+namespace xflow {
+class LRWorker {
  public:
   LRWorker(const char *train_file,
     const char *test_file) :
@@ -43,11 +54,11 @@ class LRWorker{
                       std::vector<ps::Key>& unique_keys,
                       size_t start,
                       size_t end,
-                      std::vector<float>& loss); 
+                      std::vector<float>& loss);
   void update(int start, int end);
   void batch_training(ThreadPool* pool);
   void train();
- 
+
  public:
   int epochs = 60;
 
@@ -72,5 +83,6 @@ class LRWorker{
   char train_data_path[1024];
   char test_data_path[1024];
   ps::KVWorker<float>* kv_w_;
-};//end class worker
-}
+};
+}  // namespace xflow
+#endif  // SRC_MODEL_LR_LR_WORKER_H_

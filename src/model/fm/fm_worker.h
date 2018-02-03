@@ -1,23 +1,34 @@
+/*
+ * lr_worker.h
+ * Copyright (C) 2018 wangxiaoshu <2012wxs@gmail.com>
+ *
+ * Distributed under terms of the MIT license.
+ */
+
+#ifndef SRC_MODEL_FM_FM_WORKER_H_
+#define SRC_MODEL_FM_FM_WORKER_H_
+
+#include <time.h>
+#include <unistd.h>
+#include <immintrin.h>
+
 #include <algorithm>
+#include <vector>
 #include <ctime>
 #include <iostream>
-
 #include <mutex>
 #include <functional>
 #include <random>
 #include <string>
-#include <time.h>
-#include <unistd.h>
 #include <memory>
-#include <immintrin.h>
 
 #include "src/io/load_data_from_disk.h"
 #include "src/base/thread_pool.h"
 #include "src/base/base.h"
 #include "ps/ps.h"
 
-namespace xflow{
-class FMWorker{
+namespace xflow {
+class FMWorker {
  public:
   FMWorker(const char *train_file,
            const char *test_file) :
@@ -55,6 +66,7 @@ class FMWorker{
 
  public:
   int epochs = 60;
+
  private:
   int rank;
   int core_num;
@@ -80,5 +92,6 @@ class FMWorker{
   int v_dim_ = 10;
   ps::KVWorker<float>* kv_w;
   ps::KVWorker<float>* kv_v;
-};//end class worker
-}
+};
+}  // namespace xflow
+#endif  // SRC_MODEL_FM_FM_WORKER_H_
