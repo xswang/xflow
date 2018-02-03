@@ -64,6 +64,7 @@ void MVMWorker::calculate_pctr(int start, int end){
       if (allkeys_fid == weight_fid) {
         size_t sid = all_keys[j].sid;
         size_t key_fgid = all_keys[j].fgid;
+        key_fgid = 1;
         float v_weight = v[i * v_dim_ + k];
         v_sum[k][sid][key_fgid] += v_weight;
         ++j;
@@ -175,6 +176,7 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
       if (allkeys_fid == weight_fid) {
         sid = all_keys[j].sid;
         key_fgid = all_keys[j].fgid;
+        key_fgid = 1;
         v_weight = v[i * v_dim_ + k];
         v_sum[k][sid][key_fgid] += v_weight;
         ++j;
