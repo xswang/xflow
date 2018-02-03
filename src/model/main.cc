@@ -1,3 +1,10 @@
+/*
+ * base.h
+ * Copyright (C) 2018 wangxiaoshu <2012wxs@gmail.com>
+ *
+ * Distributed under terms of the MIT license.
+ */
+
 #include "src/model/lr/lr_worker.h"
 #include "src/model/fm/fm_worker.h"
 #include "src/model/mvm/mvm_worker.h"
@@ -5,7 +12,7 @@
 
 #include "ps/ps.h"
 
-int main(int argc,char *argv[]){
+int main(int argc, char *argv[]) {
   if (argc != 5) {
     std::cout << "sh run_ps_local.sh model_index epochs\n";
     std::cout << "LR model expmple: sh run_ps_local.sh 0 100\n";
