@@ -1,11 +1,20 @@
-#pragma once
+/*
+ * base.h
+ * Copyright (C) 2018 wangxiaoshu <2012wxs@gmail.com>
+ *
+ * Distributed under terms of the MIT license.
+ */
+
+#ifndef SRC_IO_IO_H_
+#define SRC_IO_IO_H_
+
 #include <fstream>
 #include <iostream>
 #include <functional>
 #include <vector>
+#include <string>
 
-namespace xflow{
-
+namespace xflow {
 struct kv{
   int fgid;
   size_t fid;
@@ -14,15 +23,15 @@ struct kv{
 
 class IO{
  public:
-  IO(const char *file_path) : file_path(file_path){
+  explicit IO(const char *file_path) : file_path(file_path) {
     Init();
-  };
+  }
   ~IO(){};
 
-  void Init(){
+  void Init() {
     fin_.open(file_path, std::ios::in);
-    if(!fin_.is_open()){
-      std::cout<<"open file "<<file_path<<" error! "<<std::endl;
+    if (!fin_.is_open()) {
+      std::cout << "open file " << file_path << " error! " << std::endl;
       exit(1);
     }
     fp_ = fopen(file_path, "r");
@@ -55,4 +64,5 @@ class Data {
   std::vector<int> label;
 };
 
-}
+}  // namespace xflow
+#endif  // SRC_IO_IO_H_
