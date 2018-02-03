@@ -5,8 +5,10 @@
  * Distributed under terms of the MIT license.
  */
 
-#ifndef SGD_H
-#define SGD_H
+#ifndef SRC_OPTIMIZER_SGD_H_
+#define SRC_OPTIMIZER_SGD_H_
+
+#include <vector>
 
 namespace xflow {
 extern int w_dim;
@@ -18,10 +20,10 @@ class SGD {
   SGD() {}
   ~SGD() {}
 
-  typedef struct SGDEntry_w{
+  typedef struct SGDEntry_w {
     SGDEntry_w(int k = w_dim) {
       w.resize(k, 0.0);
-    };
+    }
     std::vector<float> w;
   } sgdentry_w;
 
@@ -44,7 +46,7 @@ class SGD {
       for (size_t i = 0; i < keys_size; ++i) {
         ps::Key key = req_data.keys[i];
         SGDEntry_w& val = store[key];
-        for (int j = 0; j < w_dim; ++j){
+        for (int j = 0; j < w_dim; ++j) {
           if (req_meta.push) {
             float g = req_data.vals[i * w_dim + j];
             val.w[j] -= learning_rate * g;
@@ -57,14 +59,15 @@ class SGD {
       }
       server->Response(req_meta, res);
     }
-    private:
+
+   private:
     std::unordered_map<ps::Key, sgdentry_w> store;
   };
 
-  typedef struct SGDEntry_v{
+  typedef struct SGDEntry_v {
     SGDEntry_v(int k = v_dim) {
       w.resize(k, 0.001);
-    };
+    }
     std::vector<float> w;
   } sgdentry_v;
 
@@ -87,7 +90,7 @@ class SGD {
       for (size_t i = 0; i < keys_size; ++i) {
         ps::Key key = req_data.keys[i];
         SGDEntry_v& val = store[key];
-        for (int j = 0; j < v_dim; ++j){
+        for (int j = 0; j < v_dim; ++j) {
           if (req_meta.push) {
             float g = req_data.vals[i * v_dim + j];
             val.w[j] -= learning_rate * g;
@@ -100,12 +103,13 @@ class SGD {
       }
       server->Response(req_meta, res);
     }
-    private:
-    std::unordered_map<ps::Key,sgdentry_v> store;
+
+   private:
+    std::unordered_map<ps::Key, sgdentry_v> store;
   };
 
  private:
 };
-}
+}  // namespace xflow
 
-#endif /* !SGD_H */
+#endif  // SRC_OPTIMIZER_SGD_H_
