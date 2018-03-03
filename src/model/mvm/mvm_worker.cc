@@ -143,26 +143,29 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
     std::vector<float>& push_v_gradient) {
   for (size_t k = 0; k < v_dim_; ++k) {
     for (int j = 0, i = 0; j < all_keys.size();) {
-      size_t allkeys_fid = all_keys[j].fid;
-      size_t weight_fid = unique_keys[i];
-      int sid = all_keys[j].sid;
-      int fgid = all_keys[j].fgid;
-      if (allkeys_fid == weight_fid) {
-        push_v_gradient[i * v_dim_ + k] +=
-          loss[sid] *
-          (1.0 * v_multi[k][sid] / (v_sum[k][sid][fgid]));
+      size_t allkeys_fea_id = all_keys[j].fid;
+      size_t weight_fea_id = unique_keys[i];
+      int ins_id = all_keys[j].sid;
+      int slot_id = all_keys[j].fgid;
+      if (allkeys_fea_id == weight_fea_id) {
+        float g =
+          loss[ins_id] *
+          (1.0 * v_multi[k][ins_id] / (v_sum[k][ins_id][slot_id]));
+        std::cout << "g === " << g << std::endl;
+        push_v_gradient[i * v_dim_ + k] += g;
         ++j;
-      } else if (allkeys_fid > weight_fid) {
+      } else if (allkeys_fea_id > weight_fea_id) {
         ++i;
       }
     }
   }
 
-  size_t line_num = end - start;
+  size_t ins_num = end - start;
   for (size_t i = 0; i < push_v_gradient.size(); ++i) {
-    push_v_gradient[i] /= 1.0 * line_num;
-    // std::cout << "push_v_gradient = " << push_v_gradient[i] << std::endl;
+    //push_v_gradient[i] /= 1.0 * ins_num;
+    push_v_gradient[i] /= 1.0;
   }
+  std::cout << "push_v_gradient = " << push_v_gradient[0] << std::endl;
 }
 
 void MVMWorker::calculate_loss(std::vector<float>& v,
@@ -172,17 +175,18 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     std::vector<std::vector<std::vector<float>>>& v_sum,
     std::vector<std::vector<float>>& v_multi,
     std::vector<float>& loss) {
+  int instances_number = end - start;
   float v_weight = 0.0;
-  size_t sid = 0, key_fgid = 0;
+  size_t ins_index = 0, slot_id = 0;
   for (size_t k = 0; k < v_dim_; k++) {
     for (size_t j = 0, i = 0; j < all_keys.size();) {
       size_t allkeys_fid = all_keys[j].fid;
       size_t weight_fid = unique_keys[i];
       if (allkeys_fid == weight_fid) {
-        sid = all_keys[j].sid;
-        key_fgid = all_keys[j].fgid;
+        ins_index = all_keys[j].sid;
+        slot_id = all_keys[j].fgid;
         v_weight = v[i * v_dim_ + k];
-        v_sum[k][sid][key_fgid] += v_weight;
+        v_sum[k][ins_index][slot_id] += v_weight;
         ++j;
       } else if (allkeys_fid > weight_fid) {
         ++i;
@@ -190,49 +194,51 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
     }
   }
   for (size_t k = 0; k < v_dim_; ++k) {
-    for (size_t i = 0; i < end - start; ++i) {
+    for (size_t i = 0; i < instances_number; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
         v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
+        std::cout << "v_sum_slot = " << v_sum[k][0][j] << std::endl;
       }
     }
   }
 
-  auto v_y = std::vector<float>(end-start);
-  for (size_t i = 0; i < end - start; ++i) {
+  auto v_y = std::vector<float>(instances_number);
+  for (size_t i = 0; i < instances_number; ++i) {
     for (size_t j = 0; j < v_multi.size(); ++j) {
       v_y[i] += v_multi[j][i];
     }
   }
   std::cout << "line 200 v_y[0] == " << v_y[0] << std::endl;
 
-  for (int i = 0; i < end - start; i++) {
+  for (int i = 0; i < instances_number; i++) {
     float pctr = base_->sigmoid(v_y[i]);
     loss[i] = pctr - train_data->label[start++];
   }
 }
 
 void MVMWorker::update(int start, int end) {
-  size_t idx = 0, fgid = 0;
+  size_t fea_id = 0, slot_id = 0;
   auto all_keys = std::vector<Base::sample_key>();
   auto unique_keys = std::vector<ps::Key>();
-  auto sample_fgid_num = std::vector<int>(end-start);
-  int line_num = 0;
-  for (int row = start; row < end; ++row) {
-    int sample_size = train_data->fea_matrix[row].size();
+  size_t instances_number = end - start;
+  auto sample_fgid_num = std::vector<int>(instances_number, 0);
+  size_t instance_index = 0;
+  for (size_t row = start; row < end; ++row) {
+    int max_slot_index = 0;
+    int feature_numbers = train_data->fea_matrix[row].size();
     Base::sample_key sk;
-    sk.sid = line_num;
-    auto sample_fgid_map = std::map<size_t, int>();
-    for (int j = 0; j < sample_size; ++j) {
-      fgid = train_data->fea_matrix[row][j].fgid;
-      idx = train_data->fea_matrix[row][j].fid;
-      sk.fgid = fgid;
-      sample_fgid_map.insert({fgid, 1});
-      sk.fid = idx;
+    sk.sid = instance_index;
+    for (int j = 0; j < feature_numbers; ++j) {
+      slot_id = train_data->fea_matrix[row][j].fgid;
+      fea_id = train_data->fea_matrix[row][j].fid;
+      sk.fgid = slot_id;
+      max_slot_index = max_slot_index > slot_id ? max_slot_index : slot_id;
+      sk.fid = fea_id;
       all_keys.push_back(sk);
-      unique_keys.push_back(idx);
+      unique_keys.push_back(fea_id);
     }
-    sample_fgid_num[line_num] = sample_fgid_map.size();
-    ++line_num;
+    sample_fgid_num[instance_index] = max_slot_index;
+    ++instance_index;
   }
   std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
   std::sort((unique_keys).begin(), (unique_keys).end());
@@ -243,26 +249,23 @@ void MVMWorker::update(int start, int end) {
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
 
-  auto push_v_gradient = std::vector<float>(keys_size * v_dim_);
+  auto push_v_gradient = std::vector<float>(keys_size * v_dim_, 0.0);
 
-  auto loss = std::vector<float>(end - start);
-  auto v_multi = std::vector<std::vector<float>>();
-  for (size_t k = 0; k < v_dim_; ++k) {
-    auto k_multi = std::vector<float>(end-start, 1.0);
-    v_multi.push_back(k_multi);
-  }
-  auto v_sum = std::vector<std::vector<std::vector<float>>> ();
+  auto loss = std::vector<float>(instances_number, 0.0);
+  auto v_multi = std::vector<std::vector<float>>(v_dim_, std::vector<float>(instances_number, 1.0));
+  auto v_sum =
+       std::vector<std::vector<std::vector<float>>> (v_dim_,
+                                                      std::vector<std::vector<float>>(
+                                                        instances_number, std::vector<float>()));
   for (int k = 0; k < v_dim_; ++k) {
-    auto k_sum = std::vector<std::vector<float>>();
-    for (int i = 0; i < sample_fgid_num.size(); ++i) {
-      auto fg_num = std::vector<float>(sample_fgid_num[i]);
-      k_sum.push_back(fg_num);
+    for (int i = 0; i < instances_number; ++i) {
+      auto slot_sum = std::vector<float>(sample_fgid_num[i], 0.0);
+      v_sum[k][i] = slot_sum;
     }
-    v_sum.push_back(k_sum);
   }
   calculate_loss(v, all_keys, unique_keys, start, end, v_sum, v_multi, loss);
   calculate_gradient(all_keys, unique_keys, start, end, v, v_sum, v_multi, loss,
-                     push_v_gradient);
+                    push_v_gradient);
 
   kv_v->Wait(kv_v->Push(unique_keys, push_v_gradient));
 
@@ -291,6 +294,7 @@ void MVMWorker::batch_training(ThreadPool* pool) {
         usleep(5);
       }
       ++block;
+      break;
     }
     if ((epoch + 1) % 30 == 0) std::cout << "epoch : " << epoch << std::endl;
     train_data = NULL;
