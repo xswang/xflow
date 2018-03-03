@@ -30,17 +30,17 @@ void MVMWorker::calculate_pctr(int start, int end) {
     int sample_size = test_data->fea_matrix[row].size();
     Base::sample_key sk;
     sk.sid = line_num;
-    auto sample_fgid_map = std::map<size_t, int>();
+    int max_slot_index = 0;
     for (int j = 0; j < sample_size; ++j) {
       size_t fgid = test_data->fea_matrix[row][j].fgid;
       size_t idx = test_data->fea_matrix[row][j].fid;
       sk.fgid = fgid;
-      sample_fgid_map.insert({fgid, 1});
+      max_slot_index = max_slot_index > fgid ? max_slot_index : fgid;
       sk.fid = idx;
       all_keys.push_back(sk);
       (unique_keys).push_back(idx);
     }
-    sample_fgid_num[line_num] = sample_fgid_map.size();
+    sample_fgid_num[line_num] = max_slot_index;
     ++line_num;
   }
   std::sort(all_keys.begin(), all_keys.end(), base_->sort_finder);
@@ -54,7 +54,7 @@ void MVMWorker::calculate_pctr(int start, int end) {
   for (int k = 0; k < v_dim_; ++k) {
     auto k_sum = std::vector<std::vector<float>>();
     for (int i = 0; i < sample_fgid_num.size(); ++i) {
-      auto fg_num = std::vector<float>(sample_fgid_num[i]);
+      auto fg_num = std::vector<float>(sample_fgid_num[i], 0.0);
       k_sum.push_back(fg_num);
     }
     v_sum.push_back(k_sum);
@@ -71,7 +71,6 @@ void MVMWorker::calculate_pctr(int start, int end) {
       if (allkeys_fid == weight_fid) {
         size_t sid = all_keys[j].sid;
         size_t key_fgid = all_keys[j].fgid;
-        key_fgid = 1;
         float v_weight = v[i * v_dim_ + k];
         v_sum[k][sid][key_fgid] += v_weight;
         ++j;
