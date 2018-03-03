@@ -83,7 +83,7 @@ void MVMWorker::calculate_pctr(int start, int end) {
   for (int k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < end - start; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
-        v_multi[k][i] *= v_sum[k][i][j];
+        v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
       }
     }
   }
@@ -182,7 +182,6 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
       if (allkeys_fid == weight_fid) {
         sid = all_keys[j].sid;
         key_fgid = all_keys[j].fgid;
-        key_fgid = 1;
         v_weight = v[i * v_dim_ + k];
         v_sum[k][sid][key_fgid] += v_weight;
         ++j;
@@ -194,7 +193,7 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < end - start; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
-        v_multi[k][i] *= v_sum[k][i][j];
+        v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
       }
     }
   }
