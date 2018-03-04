@@ -6,4 +6,5 @@ epochs=$2
 
 # for test
 data_path=/Users/xiaoshuwang/documents/data/libffm_toy
-sh ./scripts/local.sh 1 3 $root_path/build/test/src/xflow_lr $data_path/criteo.tr.r100.gbdt0.ffm $data_path/criteo.va.r100.gbdt0.ffm $model_name $epochs
+sh ./scripts/local.sh 1 1 $root_path/build/test/src/xflow_lr $data_path/criteo.tr.r100.gbdt0.ffm $data_path/criteo.va.r100.gbdt0.ffm $model_name $epochs
+#sh ./scripts/local.sh 1 3 $root_path/build/test/src/xflow_lr $data_path/criteo.tr.r100.gbdt0.ffm $data_path/criteo.va.r100.gbdt0.ffm $model_name $epochs

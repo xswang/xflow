@@ -191,8 +191,8 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
         ++i;
       }
     }
-    std::cout << "v_sum_slot = " << v_sum[k][0][0] << std::endl;
   }
+
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < instances_number; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
@@ -243,10 +243,9 @@ void MVMWorker::update(int start, int end) {
   (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()),
                       unique_keys.end());
   int keys_size = unique_keys.size();
-  std::cout<< "keys_size = " << keys_size << "  unique_keys[0] = " << unique_keys[0] << std::endl;
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
-  std::cout << "v[3] = " << v[3] << std::endl;
+  std::cout << "key = " << unique_keys[0] << " v = " << v[0] << std::endl;
 
   auto push_v_gradient = std::vector<float>(keys_size * v_dim_, 0.0);
 
@@ -272,7 +271,7 @@ void MVMWorker::update(int start, int end) {
 }
 
 void MVMWorker::batch_training(ThreadPool* pool) {
-  std::vector<ps::Key> key(1);
+  std::vector<ps::Key> key(1, 1);
   std::vector<float> val_v(v_dim_, 0.0);
   kv_v->Wait(kv_v->Push(key, val_v));
   for (int epoch = 0; epoch < epochs; ++epoch) {
