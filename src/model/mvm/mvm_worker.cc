@@ -245,7 +245,6 @@ void MVMWorker::update(int start, int end) {
   int keys_size = unique_keys.size();
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
-  std::cout << "key = " << unique_keys[0] << " v = " << v[0] << std::endl;
 
   auto push_v_gradient = std::vector<float>(keys_size * v_dim_, 0.0);
 
