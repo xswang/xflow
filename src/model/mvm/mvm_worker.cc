@@ -164,7 +164,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
   for (size_t i = 0; i < push_v_gradient.size(); ++i) {
     push_v_gradient[i] /= 1.0 * ins_num;
   }
-  std::cout << "pu_v_radient = " << push_v_gradient[0] << std::endl;
+  std::cout << "push_v_gradient = " << push_v_gradient[0] << std::endl;
 }
 
 void MVMWorker::calculate_loss(std::vector<float>& v,
@@ -191,6 +191,7 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
         ++i;
       }
     }
+    std::cout << "v_sum_slot = " << v_sum[k][0][0] << std::endl;
   }
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < instances_number; ++i) {
@@ -198,7 +199,6 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
         v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
       }
     }
-    std::cout << "v_sum_slot = " << v_sum[k][0][0] << std::endl;
   }
 
   auto v_y = std::vector<float>(instances_number);
@@ -207,13 +207,11 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
       v_y[i] += v_multi[j][i];
     }
   }
-  std::cout << "line 200 v_y[0] == " << v_y[0] << std::endl;
 
   for (int i = 0; i < instances_number; i++) {
     float pctr = base_->sigmoid(v_y[i]);
     loss[i] = pctr - train_data->label[start++];
   }
-  std::cout << "loss = " << loss[0] << std::endl;
 }
 
 void MVMWorker::update(int start, int end) {
@@ -245,7 +243,7 @@ void MVMWorker::update(int start, int end) {
   (unique_keys).erase(unique((unique_keys).begin(), (unique_keys).end()),
                       unique_keys.end());
   int keys_size = unique_keys.size();
-
+  std::cout<< "keys_size = " << keys_size << "  unique_keys[0] = " << unique_keys[0] << std::endl;
   auto v = std::vector<float>();
   kv_v->Wait(kv_v->Pull(unique_keys, &v));
   std::cout << "v[3] = " << v[3] << std::endl;
@@ -275,7 +273,7 @@ void MVMWorker::update(int start, int end) {
 
 void MVMWorker::batch_training(ThreadPool* pool) {
   std::vector<ps::Key> key(1);
-  std::vector<float> val_v(v_dim_);
+  std::vector<float> val_v(v_dim_, 0.0);
   kv_v->Wait(kv_v->Push(key, val_v));
   for (int epoch = 0; epoch < epochs; ++epoch) {
     xflow::LoadData train_data_loader(train_data_path, block_size << 20);
@@ -286,6 +284,7 @@ void MVMWorker::batch_training(ThreadPool* pool) {
       if (train_data->fea_matrix.size() <= 0) break;
       int thread_size = train_data->fea_matrix.size() / core_num;
       gradient_thread_finish_num = core_num;
+      std::cout << "epoch = " << epoch << " block = " << block << std::endl;
       for (int i = 0; i < core_num; ++i) {
         int start = i * thread_size;
         int end = (i + 1)* thread_size;
