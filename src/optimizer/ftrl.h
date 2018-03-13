@@ -112,13 +112,15 @@ class FTRL {
       }
       for (size_t i = 0; i < keys_size; ++i) {
         ps::Key key = req_data.keys[i];
+        FTRLEntry_v val(v_dim);;
         if (store.find(key) == store.end()) {
-          FTRLEntry_v val(v_dim);;
           for (int k = 0; k < v_dim; ++k) {
             val.w[k] = Base::local_normal_real_distribution<double>(0.0, .1)(Base::local_random_engine());
           }
+          store[key] = val;
+        } else {
+          FTRLEntry_v& val = store[key];
         }
-        FTRLEntry_v& val = store[key];
         for (int j = 0; j < v_dim; ++j) {
           if (req_meta.push) {
             float g = req_data.vals[i * v_dim + j];
