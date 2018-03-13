@@ -14,12 +14,42 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
+#include <random>
+#include <atomic>
+#include <time.h>
 
 namespace xflow {
 class Base{
  public:
   Base() {}
   ~Base() {}
+
+  static double current_realtime() {
+    struct timespec tp;
+    clock_gettime(CLOCK_REALTIME, &tp);
+    return tp.tv_sec + tp.tv_nsec * 1e-9;
+  }
+
+  static std::default_random_engine& local_random_engine() {
+    struct engine_wrapper_t {
+      std::default_random_engine engine;
+      engine_wrapper_t() {
+        static std::atomic<unsigned long> x(0);
+        std::seed_seq sseq = {x++, x++, x++, (unsigned long)(current_realtime() * 1000)};
+        engine.seed(sseq);
+      }
+    };
+    static thread_local engine_wrapper_t r;
+    return r.engine;
+  }
+
+
+  template<class T>
+  static  std::normal_distribution<T>& local_normal_real_distribution(T avg, T var) {
+      static thread_local std::normal_distribution<T> distr(avg, var);
+      return distr;
+  }
+
 
   float sigmoid(float x) {
     if (x < -30) {
@@ -53,9 +83,9 @@ class Base{
 
   void calculate_auc(std::vector<auc_key>& auc_vec) {
     std::sort(auc_vec.begin(), auc_vec.end(), [](const auc_key& a,
-                                                 const auc_key& b){
-      return a.pctr > b.pctr;
-    });
+          const auc_key& b){
+        return a.pctr > b.pctr;
+        });
     float area = 0.0;
     int tp_n = 0;
     for (size_t i = 0; i < auc_vec.size(); ++i) {
@@ -74,8 +104,8 @@ class Base{
     } else {
       area /= 1.0 * (tp_n * (auc_vec.size() - tp_n));
       std::cout << "auc = " << area
-                << "\ttp = " << tp_n
-                << " fp = " << auc_vec.size() - tp_n << std::endl;
+        << "\ttp = " << tp_n
+        << " fp = " << auc_vec.size() - tp_n << std::endl;
     }
   }
 
