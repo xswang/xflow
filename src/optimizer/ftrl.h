@@ -9,6 +9,7 @@
 #define SRC_OPTIMIZER_FTRL_H_
 
 #include <vector>
+#include "src/base/base.h"
 
 namespace xflow {
 int w_dim;
@@ -111,12 +112,16 @@ class FTRL {
       }
       for (size_t i = 0; i < keys_size; ++i) {
         ps::Key key = req_data.keys[i];
+        if (store.find(key) == store.end()) {
+          FTRLEntry_v val(v_dim);;
+          for (int k = 0; k < v_dim; ++k) {
+            val.w[k] = Base::local_normal_real_distribution<double>(0.0, .1)(Base::local_random_engine());
+          }
+        }
         FTRLEntry_v& val = store[key];
         for (int j = 0; j < v_dim; ++j) {
           if (req_meta.push) {
             float g = req_data.vals[i * v_dim + j];
-            if (g < 1e-6) g = 0.0;
-            if(i == 0)std::cout << "g is nan " << isnan(g) << std::endl;
             float old_n = val.n[j];
             float n = old_n + g * g;
             val.z[j] += g -
@@ -129,23 +134,14 @@ class FTRL {
               float tmpr = 0.0;
               if (val.z[j] > 0.0) tmpr = val.z[j] - lambda1;
               if (val.z[j] < 0.0) tmpr = val.z[j] + lambda1;
-              if(i == 0) std::cout << "n ===== " << n << std::endl;
               float tmpl = -1 * ((beta + std::sqrt(val.n[j]))/alpha  + lambda2);
               val.w[j] = tmpr / tmpl;
-              if(i == 0){
-                std::cout << "push after calc 1265606537245114 val.w = " << store[1265606537245114].w[1] << std::endl;
-              }
             }
           } else {
-            if(i == 0) {
-              std::cout << "pull key = " << key << " val.w = "<< val.w[1]<< std::endl;
-              std::cout << "pull 1265606537245114 val.w is nan  " << isnan(store[1265606537245114].w[1]) << std::endl;
-            }
             res.vals[i * v_dim + j] = val.w[j];
           }
         }
       }
-      std::cout << "=========================" << std::endl;
       server->Response(req_meta, res);
     }
 
