@@ -38,7 +38,6 @@ class MVMWorker {
     kv_v = new ps::KVWorker<float>(1);
     base_ = new Base;
     core_num = std::thread::hardware_concurrency();
-    core_num = 1;
     pool_ = new ThreadPool(core_num);
   }
   ~MVMWorker() {}
@@ -90,7 +89,7 @@ class MVMWorker {
   const char *test_file_path;
   char train_data_path[1024];
   char test_data_path[1024];
-  int v_dim_ = 5;
+  int v_dim_ = 10;
   ps::KVWorker<float>* kv_v;
 };
 }  // namespace xflow

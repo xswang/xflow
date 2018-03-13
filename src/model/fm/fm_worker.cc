@@ -103,7 +103,7 @@ void FMWorker::predict(ThreadPool* pool, int rank, int block) {
   if (!md.is_open()) std::cout << "open pred file failure!" << std::endl;
 
   snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-  xflow::LoadData test_data_loader(test_data_path, ((size_t)4) << 20);
+  xflow::LoadData test_data_loader(test_data_path, ((size_t)2) << 20);
   test_data = &(test_data_loader.m_data);
   test_auc_vec.clear();
   while (true) {

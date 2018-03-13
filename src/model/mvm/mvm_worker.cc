@@ -113,7 +113,7 @@ void MVMWorker::predict(ThreadPool* pool, int rank, int block) {
   if (!md.is_open()) std::cout << "open pred file failure!" << std::endl;
 
   snprintf(test_data_path, 1024, "%s-%05d", test_file_path, rank);
-  xflow::LoadData test_data_loader(test_data_path, ((size_t)4) << 20);
+  xflow::LoadData test_data_loader(test_data_path, ((size_t)2) << 20);
   test_data = &(test_data_loader.m_data);
   test_auc_vec.clear();
   while (true) {
@@ -164,7 +164,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
   for (size_t i = 0; i < push_v_gradient.size(); ++i) {
     push_v_gradient[i] /= 1.0 * ins_num;
   }
-  std::cout << "push_v_gradient = " << push_v_gradient[0] << std::endl;
+  //std::cout << "push_v_gradient = " << push_v_gradient[0] << std::endl;
 }
 
 void MVMWorker::calculate_loss(std::vector<float>& v,
@@ -282,7 +282,7 @@ void MVMWorker::batch_training(ThreadPool* pool) {
       if (train_data->fea_matrix.size() <= 0) break;
       int thread_size = train_data->fea_matrix.size() / core_num;
       gradient_thread_finish_num = core_num;
-      std::cout << "epoch = " << epoch << " block = " << block << std::endl;
+      //std::cout << "epoch = " << epoch << " block = " << block << std::endl;
       for (int i = 0; i < core_num; ++i) {
         int start = i * thread_size;
         int end = (i + 1)* thread_size;
