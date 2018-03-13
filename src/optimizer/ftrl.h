@@ -12,8 +12,8 @@
 #include "src/base/base.h"
 
 namespace xflow {
-int w_dim;
-int v_dim;
+int w_dim = 1;
+int v_dim = 10;
 float alpha = 5e-2;
 float beta = 1.0;
 float lambda1 = 5e-5;
@@ -104,7 +104,6 @@ class FTRL {
 
       if (req_meta.push) {
         size_t vals_size = req_data.vals.size();
-        v_dim = vals_size / keys_size;
         CHECK_EQ(keys_size, vals_size / v_dim);
       } else {
         res.keys = req_data.keys;
@@ -112,15 +111,16 @@ class FTRL {
       }
       for (size_t i = 0; i < keys_size; ++i) {
         ps::Key key = req_data.keys[i];
-        FTRLEntry_v val(v_dim);;
         if (store.find(key) == store.end()) {
+          FTRLEntry_v val(v_dim);;
           for (int k = 0; k < v_dim; ++k) {
-            val.w[k] = Base::local_normal_real_distribution<double>(0.0, .1)(Base::local_random_engine());
+            val.w[k] = Base::local_normal_real_distribution<double>(0.0, .01)(Base::local_random_engine());
           }
           store[key] = val;
-        } else {
-          FTRLEntry_v& val = store[key];
         }
+
+        FTRLEntry_v& val = store[key];
+        
         for (int j = 0; j < v_dim; ++j) {
           if (req_meta.push) {
             float g = req_data.vals[i * v_dim + j];
