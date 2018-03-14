@@ -82,7 +82,8 @@ void MVMWorker::calculate_pctr(int start, int end) {
   for (int k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < end - start; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
-        v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
+        //v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
+        v_multi[k][i] *= (v_sum[k][i][j]);
       }
     }
   }
@@ -152,6 +153,7 @@ void MVMWorker::calculate_gradient(std::vector<Base::sample_key>& all_keys,
         gradient =
           loss[ins_id] *
           (1.0 * v_multi[k][ins_id] / (1.0 + v_sum[k][ins_id][slot_id]));
+        if (v_sum[k][ins_id][slot_id] == 0.0) gradient = 0.0;
         push_v_gradient[i * v_dim_ + k] += gradient;
         ++j;
       } else if (allkeys_fea_id > weight_fea_id) {
@@ -196,7 +198,8 @@ void MVMWorker::calculate_loss(std::vector<float>& v,
   for (size_t k = 0; k < v_dim_; ++k) {
     for (size_t i = 0; i < instances_number; ++i) {
       for (size_t j = 0; j < v_sum[k][i].size(); ++j) {
-        v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
+        //v_multi[k][i] *= (1.0 + v_sum[k][i][j]);
+        v_multi[k][i] *= (v_sum[k][i][j]);
       }
     }
   }

@@ -114,7 +114,7 @@ class FTRL {
         if (store.find(key) == store.end()) {
           FTRLEntry_v val(v_dim);;
           for (int k = 0; k < v_dim; ++k) {
-            val.w[k] = Base::local_normal_real_distribution<double>(0.0, .01)(Base::local_random_engine());
+            val.w[k] = Base::local_normal_real_distribution<double>(0.0, 1.0)(Base::local_random_engine()) * 1e-2;
           }
           store[key] = val;
         }
